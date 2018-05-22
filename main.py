@@ -66,7 +66,8 @@ from libs.ustr import ustr
 from libs.version import __version__
 from libs.zoomWidget import ZoomWidget
 
-from libs.detection import Detector, OBJ_THRESH
+from libs.detection import YOLODetector, OBJ_THRESH
+from libs.detection import MaskRCNNDetector
 
 __appname__ = 'ADPKD Support Tool'
 
@@ -126,8 +127,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.settings.load()
         settings = self.settings
 
-        self.model_weights = 'yolo3_cells.h5'
-
+        # self.model_weights = 'yolo3_cells_2.h5'
+        self.model_weights = 'mask_rcnn_cell_0030.h5'
         # Save as Pascal voc xml
         self.defaultSaveDir = None
         self.usingPascalVocFormat = True
@@ -243,37 +244,39 @@ class MainWindow(QMainWindow, WindowMixin):
         self.segmentationOverlay = None
         self.contourOverlay = None
         # Custom Cell Detector
-        self.detector = Detector(self.model_weights)
+
+        # self.detector = YOLODetector(self.model_weights)
+        self.detector = MaskRCNNDetector(self.model_weights)
         self.contourCoordinates = None
         # Actions
         action = partial(newAction, self)
         quit = action('&Schließen', self.close, 'Ctrl+Q', 'Schließen', u'Anwendung verlassen')
-        open = action('&Öffnen', self.openFile, 'Ctrl+O', 'Datei', u'Öffnen eines Bildes', icon='')
-        opendir = action('&Ordner\nöffnen', self.openDirDialog, 'Ctrl+u', 'Ordner', u'Ordner öffnen')
+        open = action('&Öffnen', self.openFile, 'Ctrl+O', icon='icons/file.png', tip=u'Öffnen eines Bildes')
+        opendir = action('&Ordner\nöffnen', self.openDirDialog, 'Ctrl+u', 'icons/open.png', u'Ordner öffnen')
         # changeSavedir = action('&Change Anno Dir', self.changeSavedirDialog, 'Ctrl+r', 'open', u'Change default saved Annotation dir')
         #openAnnotation = action('&Open Annotation', self.openAnnotationDialog, 'Ctrl+Shift+O', 'open', u'Open Annotation')
-        openNextImg = action('&Nächstes\nBild', self.openNextImg, 'd', 'Nächstes', u'Nächstes Bild anzeigen')
-        openPrevImg = action('&Voheriges\nBild', self.openPrevImg, 'a', 'Vorheriges', u'Voheriges Bild anzeigen')
+        openNextImg = action('&Nächstes\nBild', self.openNextImg, 'd', 'icons/next.png', u'Nächstes Bild anzeigen')
+        openPrevImg = action('&Voheriges\nBild', self.openPrevImg, 'a', 'icons/prev.png', u'Voheriges Bild anzeigen')
         #verify = action('&Verify Image', self.verifyImg, 'space', 'verify', u'Verify Image')
-        save = action('&Speichern', self.saveFile, 'Ctrl+S', 'Speichern', u'Speichern der Markierungen', enabled=False)
+        save = action('&Speichern', self.saveFile, 'Ctrl+S', 'icons/save.png', u'Speichern der Markierungen', enabled=False)
         # saveAs = action('&Save As', self.saveFileAs, 'Ctrl+Shift+S', 'save-as', u'Save labels to a different file', enabled=False)
-        close = action('&Schließen', self.closeFile, 'Ctrl+W', 'Schließen', u'Aktuelle Datei schließen')
-        resetSettings = action('&Zurücksetzen\naller\nEinstellungen &\n Neu starten', self.resetAll, None, 'Zurücksetzen', u'Einstellungen zurücksetzen')
+        close = action('&Schließen', self.closeFile, 'Ctrl+W', 'icons/close.png', u'Aktuelle Datei schließen')
+        resetSettings = action('&Zurücksetzen\naller\nEinstellungen &\n Neu starten', self.resetAll, None, 'icons/resetall.png', u'Einstellungen zurücksetzen')
         #color1 = action('Box Line Color', self.chooseColor1, 'Ctrl+L', 'color_line', u'Choose Box line color')
-        createMode = action('&Markierung\nerstellen', self.setCreateMode, 'w', 'Neu', u'Markierungsmodus', enabled=False)
-        editMode = action('&Markierungen\nbearbeiten', self.setEditMode, 'Ctrl+J', 'Bearbeiten', u'Editierungsmodus', enabled=False)
+        createMode = action('&Markierung\nerstellen', self.setCreateMode, 'w', 'icons/feBlend-icon.png', u'Markierungsmodus', enabled=False)
+        editMode = action('&Markierungen\nbearbeiten', self.setEditMode, 'Ctrl+J', 'icons/edit.png', u'Editierungsmodus', enabled=False)
         # create = action('Create\nRectBox', self.createShape, 'w', 'new', u'Draw a new Box', enabled=False)
-        delete = action('&Markierungen\nlöschen', self.deleteSelectedShape, 'delete', 'delete', u'Löschen', enabled=False)
-        reload = action('&Bild neu laden', self.reloadImg, 'Ctrl+R', 'Aktuelles Bild neu laden', u'Aktuelle Bild neu laden', enabled=True)
-        resetBoxes = action('&Markierungen\nzurücksetzen', self.resetImg, None, 'Markierungen des aktuellen Bildes zurücksetzen', u'Markierungen des aktuellen Bildes zurücksetzen', enabled=True)
+        delete = action('&Markierungen\nlöschen', self.deleteSelectedShape, 'delete', 'icons/delete.png', u'Löschen', enabled=False)
+        reload = action('&Bild neu laden', self.reloadImg, 'Ctrl+R', 'icons/verify.png', u'Aktuelle Bild neu laden', enabled=True)
+        resetBoxes = action('&Markierungen\nzurücksetzen', self.resetImg, None, 'icons/quit.png', u'Markierungen des aktuellen Bildes zurücksetzen', enabled=True)
         # copy = action('&Duplicate\nRectBox', self.copySelectedShape, 'Ctrl+D', 'copy', u'Create a duplicate of the selected Box', enabled=False)
         # advancedMode = action('&Advanced Mode', self.toggleAdvancedMode, 'Ctrl+Shift+A', 'expert', u'Switch to advanced mode', checkable=True)
         #hideAll = action('&Hide\nRectBox', partial(self.togglePolygons, False), 'Ctrl+H', 'hide', u'Hide all Boxs', enabled=False)
         #showAll = action('&Show\nRectBox', partial(self.togglePolygons, True),'Ctrl+A', 'hide', u'Show all Boxs', enabled=False)
         segmentationOverlay = action('Segmentierung einblenden', self.toggleSegmentationOverlay, None, 'Overlay einblenden', u'Segmentierung einblenden', checkable=True, enabled=True)
         contourOverlay = action('Kontur erstellen/\neinblenden', self.toggleContourOverlay, None, 'Overlay einblenden', u'Kontur einblenden', checkable=True, enabled=True)
-        generateOutput = action('Ergebnis erzeugen', self.genOutput, None, 'Ergebnisbild erzeugen', u'Ergebnisbild erzeugen')
-        autoDetect = action('&Automatische\nErkennung', self.cellDetection, None, 'Erkennen', u'Automatische Erkennung von Zellen')
+        generateOutput = action('Ergebnis erzeugen', self.genOutput, None, 'icons/labels.png', u'Ergebnisbild erzeugen')
+        autoDetect = action('&Automatische\nErkennung', self.cellDetection, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen')
 
         # showInfo = action('&Information', self.showInfoDialog, None, 'help', u'Information')
 
@@ -1088,28 +1091,36 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.mayContinue():
             return
         localPath = self.filePath.split(os.path.basename(self.filePath))[0]
-        # print(self.filePath)
-        # print(self.filePath, os.path.basename(self.filePath))
         imgFileName = os.path.basename(self.filePath)
-        # currentImg = cv2.imread('{0}/{1}'.format(localPath, imgFileName))
-        currentImg = cv2.imread(self.filePath)
-        boxes = self.detector.predictBoxes(currentImg)
-        height, width, depth = currentImg.shape
-        # filename = localPath + imgFileName.split('.')[0] + '.xml'
-        filename = self.filePath.split('.')[0] + '.xml'
-        # print(filename)
-        writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=self.filePath)
-        writer.verified = False
-        for box in boxes:
-            if box.classes[0] > OBJ_THRESH:
-                # print(box.classes[0])
-                xmin = int(box.xmin)
-                ymin = int(box.ymin)
-                xmax = int(box.xmax)
-                ymax = int(box.ymax)
-                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, [])
-            else:
-                continue
+        currentImg = io.imread(self.filePath)
+        if isinstance(self.detector, YOLODetector):
+            boxes = self.detector.predictBoxes(currentImg)
+            height, width, depth = currentImg.shape
+            filename = self.filePath.split('.')[0] + '.xml'
+            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=self.filePath)
+            writer.verified = False
+            for box in boxes:
+                if box.classes[0] > OBJ_THRESH:
+                    xmin = int(box.xmin)
+                    ymin = int(box.ymin)
+                    xmax = int(box.xmax)
+                    ymax = int(box.ymax)
+                    writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, [])
+                else:
+                    continue
+        elif isinstance(self.detector, MaskRCNNDetector):
+            boxes = self.detector.predictBoxesAndContour(currentImg)
+            height, width, depth = currentImg.shape
+            filename = self.filePath.split('.')[0] + '.xml'
+            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=self.filePath)
+            writer.verified = False
+            for box in boxes:
+                xmin = box.xmin
+                xmax = box.xmax
+                ymin = box.ymin
+                ymax = box.ymax
+                contour = box.contour
+                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, contour)
         writer.save(targetFile=filename)
         self.loadRecent(self.filePath, True)
 
@@ -1330,15 +1341,19 @@ class MainWindow(QMainWindow, WindowMixin):
                 xmin, xmax, ymin, ymax = s.points[0].x(), s.points[2].x(), s.points[0].y(), s.points[2].y()
                 height, width = int(xmax - xmin), int(ymax - ymin)
                 img = np.zeros((width, height)).astype(np.uint8)
-                points = np.asarray([(int(y), int(x)) for y, x in s.contour_points])
-                polygon_points = [(int(x+xmin), int(y+ymin)) for y, x in s.contour_points]
-                for y in range(img.shape[0]):
-                    for x in range(img.shape[1]):
-                        if cv2.pointPolygonTest(points, (y, x), False) != -1.0:
-                            img[y,x] = 1
-                area = img.sum()
-                draw.text((int(xmax), int(ymin)), "{}".format(area), fill=(0,0,0,255), font=font)
-                draw.polygon(polygon_points, outline=(255,255,0,255))
+                if not s.contour_points:
+                    continue
+                else:
+                    points = np.asarray([(int(y), int(x)) for y, x in s.contour_points])
+                    polygon_points = [(int(x+xmin), int(y+ymin)) for y, x in s.contour_points]
+                    for y in range(img.shape[0]):
+                        for x in range(img.shape[1]):
+                            if cv2.pointPolygonTest(points, (y, x), False) != -1.0:
+                                img[y,x] = 1
+                    area = img.sum()
+                    draw.text((int(xmax), int(ymin)), "{}".format(area), fill=(0,0,0,255), font=font)
+                    draw.polygon(polygon_points, outline=(255,255,0,255))
+            draw.text((10, 10), str(len(self.canvas.shapes)), fill=(0,0,0,255), font=font)
             fileName = self.filePath.split('.')[0] + '_done' + '.jpg'
             file.save(fileName)
 

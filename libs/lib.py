@@ -28,7 +28,9 @@ def newAction(parent, text, slot=None, shortcut=None, icon=None,
     """Create a new action and assign callbacks, shortcuts, etc."""
     a = QAction(text, parent)
     if icon is not None:
-        a.setIcon(newIcon(icon))
+        i = QIcon()
+        i.addFile(icon, QSize(5,5))
+        a.setIcon(i)
     if shortcut is not None:
         if isinstance(shortcut, (list, tuple)):
             a.setShortcuts(shortcut)

@@ -164,7 +164,7 @@ class Canvas(QWidget):
                     self.overrideCursor(CURSOR_MOVE)
                     self.boundedMoveShape(self.selectedShape, pos)
                     self.shapeMoved.emit()
-                    self.selectedShape.contour_points = list()
+                    # self.selectedShape.contour_points = list()
                     self.repaint()
                 return
         
@@ -190,7 +190,7 @@ class Canvas(QWidget):
         # - Highlight shapes
         # - Highlight vertex
         # Update shape/vertex fill and tooltip value accordingly.
-        self.setToolTip("Image")
+        # self.setToolTip('')
         for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
             # Look for a nearby vertex to highlight. If that fails,
             # check if we happen to be inside a shape.
@@ -682,8 +682,10 @@ class Canvas(QWidget):
         elif key == Qt.Key_N and self.selectedShape and self.contourMode:
             if not self.selectedShape.contour_points:
                 self.selectedShape.contour_points = self.genContourInShape(self.selectedShape)
+                self.update()
         elif key == Qt.Key_R and self.selectedShape and self.contourMode:
             self.selectedShape.contour_points = list()
+            self.update()
 
     def genContourInShape(self, shape):
         genContour = list()
