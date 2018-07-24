@@ -4,7 +4,7 @@ import os
 # from .colors import get_color
 
 class BoundBox:
-    def __init__(self, xmin, ymin, xmax, ymax, c=None, classes=None, contour=None):
+    def __init__(self, xmin, ymin, xmax, ymax, c=None, classes=None, contour=None, confidence=0):
         self.xmin = xmin
         self.ymin = ymin
         self.xmax = xmax
@@ -13,6 +13,7 @@ class BoundBox:
         self.c       = c
         self.classes = classes
         self.contour = contour
+        self.confidence = confidence
         self.label = -1
         self.score = -1
 

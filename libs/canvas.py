@@ -45,8 +45,10 @@ class Canvas(QWidget):
         self.current = None
         self.selectedShape = None  # save the selected shape here
         self.selectedShapeCopy = None
-        self.drawingLineColor = QColor(0, 0, 255)
-        self.drawingRectColor = QColor(0, 0, 255)
+        # self.drawingLineColor = QColor(0, 0, 255)
+        # self.drawingRectColor = QColor(0, 0, 255)
+        self.drawingLineColor = QColor(255, 255, 255, 255)
+        self.drawingRectColor = QColor(255, 255, 255, 255)
         self.drawingContourColor = QColor(255, 0, 0)
         self.line = Shape(line_color=self.drawingLineColor)
         self.prevPoint = QPointF()
@@ -177,12 +179,17 @@ class Canvas(QWidget):
                     cntNew = int(pos.y() - shapeOrigin.y()), int(pos.x() - shapeOrigin.x())
                     delta_y, delta_x = cntNew[0] - cntOld[0], cntNew[1] - cntOld[1]
                     # print(delta_y, delta_x)
-                    for i in range(self.cntOldidx-3, self.cntOldidx+4, 1):
-                        i %= len(self.selectedShape.contour_points)
-                        p = self.selectedShape.contour_points[i]
-                        d = np.sqrt((p[0]-cntOld[0])**2 + (p[1]-cntOld[1])**2)
-                        f = 1/(1 + 1.8 * np.sqrt((p[0]-cntOld[0])**2 + (p[1]-cntOld[1])**2)) 
-                        self.selectedShape.contour_points[i] = (p[0] + delta_y * f, p[1] + delta_x * f)
+                    mods = ev.modifiers()
+                    if Qt.ControlModifier == int(mods):
+                        for i, p in enumerate(self.selectedShape.contour_points):
+                            self.selectedShape.contour_points[i] = (p[0] + delta_y, p[1] + delta_x)
+                    else:
+                        for i in range(self.cntOldidx-3, self.cntOldidx+4, 1):
+                            i %= len(self.selectedShape.contour_points)
+                            p = self.selectedShape.contour_points[i]
+                            d = np.sqrt((p[0]-cntOld[0])**2 + (p[1]-cntOld[1])**2)
+                            f = 1/(1 + 1.8 * d) 
+                            self.selectedShape.contour_points[i] = (p[0] + delta_y * f, p[1] + delta_x * f)
                         # print(p, f, self.selectedShape.contour_points[i])
             self.repaint()
             return
@@ -201,16 +208,16 @@ class Canvas(QWidget):
                 self.hVertex, self.hShape = index, shape
                 shape.highlightVertex(index, shape.MOVE_VERTEX)
                 self.overrideCursor(CURSOR_POINT)
-                self.setToolTip("Click & drag to move point")
-                self.setStatusTip(self.toolTip())
+                # self.setToolTip("Click & drag to move point")
+                # self.setStatusTip(self.toolTip())
                 self.update()
                 break
             elif shape.containsPoint(pos):
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.hVertex, self.hShape = None, shape
-                self.setToolTip("Click & drag to move shape '%s'" % shape.label)
-                self.setStatusTip(self.toolTip())
+                # self.setToolTip("Click & drag to move shape '%s'" % shape.label)
+                # self.setStatusTip(self.toolTip())
                 self.overrideCursor(CURSOR_GRAB)
                 self.update()
                 break
@@ -280,7 +287,7 @@ class Canvas(QWidget):
                         i %= len(self.selectedShape.contour_points)
                         p = self.selectedShape.contour_points[i]
                         d = np.sqrt((p[0]-cntOld[0])**2 + (p[1]-cntOld[1])**2)
-                        f = 1/(1 + 1.4 * np.sqrt((p[0]-cntOld[0])**2 + (p[1]-cntOld[1])**2)) 
+                        f = 1/(1 + 1.4 * d) 
                         self.selectedShape.contour_points[i] = (p[0] + delta_y * f, p[1] + delta_x * f)
                         # print(p, f, self.selectedShape.contour_points[i])
             self.repaint()
@@ -436,7 +443,11 @@ class Canvas(QWidget):
     def deleteSelected(self):
         if self.selectedShape and not self.contourMode:
             shape = self.selectedShape
-            self.shapes.remove(self.selectedShape)
+            if self.selectedShape in self.shapes:
+                print('Box wurde gelöscht')
+                self.shapes.remove(self.selectedShape)
+            else:
+                print('Zu löschen Box wurde nicht gefunden {0}{1}{2}{3}\n'.format(xmin, xmax, ymin, ymax))
             self.selectedShape = None
             self.update()
             return shape

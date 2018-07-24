@@ -45,8 +45,9 @@ class LabelFile(object):
             label = shape['label']
             difficult = int(shape['difficult'])
             contour_points = shape['contour_points']
+            confidence = shape['confidence']
             bndbox = LabelFile.convertPoints2BndBox(points)
-            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, difficult, contour_points)
+            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, difficult, contour_points, confidence)
 
         writer.save(targetFile=filename)
         return

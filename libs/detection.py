@@ -85,15 +85,16 @@ class MaskRCNNDetector:
             print('Missing image: No image provided')
             sys.exit(-1)
         else:
+            height, width = img.shape[0], img.shape[1]
             r = self.model.detect([img], verbose=0)[0]
-            rois, masks = r['rois'], r['masks']
+            rois, masks, confidences = r['rois'], r['masks'], r['scores']
             masks = np.rollaxis(masks, 2, 0)
-            for roi, mask in zip(rois, masks):
+            for roi, mask, confidence in zip(rois, masks, confidences):
                 # print(roi, mask)
-                ymin, ymax, xmin, xmax = roi[0], roi[2], roi[1], roi[3]
+                ymin, ymax, xmin, xmax = np.clip(roi[0] - 5, 0, height), np.clip(roi[2] + 5, 0, height), np.clip(roi[1] - 5, 0, width), np.clip(roi[3] + 5, 0, width)  # 5 pixel border for bigger local canvas
                 m = (mask[ymin:ymax, xmin:xmax])
                 bin_img = np.zeros(m.shape).astype(np.uint8)
                 bin_img[m] = 1
                 contour = self.buildContourPoints(bin_img)
-                boxes.append(BoundBox(xmin, ymin, xmax, ymax, contour=contour))
+                boxes.append(BoundBox(xmin, ymin, xmax, ymax, contour=contour, confidence=confidence))
         return boxes

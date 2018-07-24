@@ -1,23 +1,25 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
-
 try:
     from PyQt5.QtGui import *
     from PyQt5.QtCore import *
 except ImportError:
     from PyQt4.QtGui import *
     from PyQt4.QtCore import *
-
 from libs.lib import distance
 import sys
 
-DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
-DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
-DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255)
-DEFAULT_SELECT_FILL_COLOR = QColor(0, 128, 255, 155)
-DEFAULT_VERTEX_FILL_COLOR = QColor(0, 255, 0, 255)
-DEFAULT_HVERTEX_FILL_COLOR = QColor(255, 0, 0)
+# DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
+DEFAULT_LINE_COLOR = QColor(255, 255, 255, 255)
+# DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
+DEFAULT_FILL_COLOR = QColor(255, 255, 255, 255)
+DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255, 255)
+# DEFAULT_SELECT_FILL_COLOR = QColor(0, 128, 255, 155)
+DEFAULT_SELECT_FILL_COLOR = QColor('transparent')
+# DEFAULT_VERTEX_FILL_COLOR = QColor(0, 255, 0, 255)
+DEFAULT_VERTEX_FILL_COLOR = QColor(255, 255, 255, 255)
+# DEFAULT_HVERTEX_FILL_COLOR = QColor(255, 0, 0)
+DEFAULT_HVERTEX_FILL_COLOR = QColor(255, 255, 255, 255)
 
 
 class Shape(object):
@@ -37,11 +39,12 @@ class Shape(object):
     point_size = 8
     scale = 1.0
 
-    def __init__(self, label=None, line_color=None, difficult=False):
+    def __init__(self, label=None, line_color=None, difficult=False, confidence=1.0):
         self.label = label
         # points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
         self.points = list()
         self.contour_points = list()
+        self.confidence = confidence
         self.fill = False
         self.selected = False
         self.difficult = difficult
@@ -114,7 +117,7 @@ class Shape(object):
                 font.setPointSize(8)
                 font.setBold(True)
                 painter.setFont(font)
-                painter.drawText(min_x, min_y, self.label)
+                painter.drawText(min_x, min_y, str(self.confidence))
             if self.fill:
                 color = self.select_fill_color if self.selected else self.fill_color
                 painter.fillPath(line_path, color)
@@ -135,7 +138,7 @@ class Shape(object):
         elif shape == self.P_ROUND:
             path.addEllipse(point, d / 2.0, d / 2.0)
         else:
-            assert False, "unsupported vertex shape"
+            return
 
     def nearestVertex(self, point, epsilon):
         for i, p in enumerate(self.points):

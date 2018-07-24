@@ -23,7 +23,9 @@ from skimage.segmentation import morphological_chan_vese, checkerboard_level_set
 from skimage.exposure import equalize_hist, equalize_adapthist, adjust_gamma, adjust_log, adjust_sigmoid
 from skimage.filters.rank import enhance_contrast
 from skimage.morphology import disk
+from skimage._shared.utils import assert_nD
 from skimage.draw import line, line_aa
+from shapely.geometry import Polygon
 
 try:
     from PyQt5.QtGui import *
@@ -68,6 +70,7 @@ from libs.zoomWidget import ZoomWidget
 
 from libs.detection import YOLODetector, OBJ_THRESH
 from libs.detection import MaskRCNNDetector
+from libs.excelExport import cellTableGenerator
 
 __appname__ = 'ADPKD Support Tool'
 
@@ -128,7 +131,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings = self.settings
 
         # self.model_weights = 'yolo3_cells_2.h5'
-        self.model_weights = 'mask_rcnn_cell_0030.h5'
+        self.model_weights = 'mask_rcnn_cell_0030_2.h5'
         # Save as Pascal voc xml
         self.defaultSaveDir = None
         self.usingPascalVocFormat = True
@@ -180,20 +183,6 @@ class MainWindow(QMainWindow, WindowMixin):
         listLayout.addWidget(self.diffcButton)
         listLayout.addWidget(useDefaultLabelContainer)
 
-        # Create and add a widget for showing current label items
-        # self.labelList = QListWidget()
-        # labelListContainer = QWidget()
-        # labelListContainer.setLayout(listLayout)
-        # self.labelList.itemActivated.connect(self.labelSelectionChanged)
-        # self.labelList.itemSelectionChanged.connect(self.labelSelectionChanged)
-        # self.labelList.itemDoubleClicked.connect(self.editLabel)
-        # # Connect to itemChanged to detect checkbox changes.
-        # self.labelList.itemChanged.connect(self.labelItemChanged)
-        # listLayout.addWidget(self.labelList)
-
-        # self.dock = QDockWidget(u'Box Labels', self)
-        # self.dock.setObjectName(u'Labels')
-        # self.dock.setWidget(labelListContainer)
 
         # Tzutalin 20160906 : Add file list and dock to move faster
         self.fileListWidget = QListWidget()
@@ -251,42 +240,23 @@ class MainWindow(QMainWindow, WindowMixin):
         # Actions
         action = partial(newAction, self)
         quit = action('&Schließen', self.close, 'Ctrl+Q', 'Schließen', u'Anwendung verlassen')
-        open = action('&Öffnen', self.openFile, 'Ctrl+O', icon='icons/file.png', tip=u'Öffnen eines Bildes')
         opendir = action('&Ordner\nöffnen', self.openDirDialog, 'Ctrl+u', 'icons/open.png', u'Ordner öffnen')
-        # changeSavedir = action('&Change Anno Dir', self.changeSavedirDialog, 'Ctrl+r', 'open', u'Change default saved Annotation dir')
-        #openAnnotation = action('&Open Annotation', self.openAnnotationDialog, 'Ctrl+Shift+O', 'open', u'Open Annotation')
         openNextImg = action('&Nächstes\nBild', self.openNextImg, 'd', 'icons/next.png', u'Nächstes Bild anzeigen')
         openPrevImg = action('&Voheriges\nBild', self.openPrevImg, 'a', 'icons/prev.png', u'Voheriges Bild anzeigen')
-        #verify = action('&Verify Image', self.verifyImg, 'space', 'verify', u'Verify Image')
         save = action('&Speichern', self.saveFile, 'Ctrl+S', 'icons/save.png', u'Speichern der Markierungen', enabled=False)
-        # saveAs = action('&Save As', self.saveFileAs, 'Ctrl+Shift+S', 'save-as', u'Save labels to a different file', enabled=False)
         close = action('&Schließen', self.closeFile, 'Ctrl+W', 'icons/close.png', u'Aktuelle Datei schließen')
         resetSettings = action('&Zurücksetzen\naller\nEinstellungen &\n Neu starten', self.resetAll, None, 'icons/resetall.png', u'Einstellungen zurücksetzen')
-        #color1 = action('Box Line Color', self.chooseColor1, 'Ctrl+L', 'color_line', u'Choose Box line color')
         createMode = action('&Markierung\nerstellen', self.setCreateMode, 'w', 'icons/feBlend-icon.png', u'Markierungsmodus', enabled=False)
         editMode = action('&Markierungen\nbearbeiten', self.setEditMode, 'Ctrl+J', 'icons/edit.png', u'Editierungsmodus', enabled=False)
-        # create = action('Create\nRectBox', self.createShape, 'w', 'new', u'Draw a new Box', enabled=False)
         delete = action('&Markierungen\nlöschen', self.deleteSelectedShape, 'delete', 'icons/delete.png', u'Löschen', enabled=False)
         reload = action('&Bild neu laden', self.reloadImg, 'Ctrl+R', 'icons/verify.png', u'Aktuelle Bild neu laden', enabled=True)
         resetBoxes = action('&Markierungen\nzurücksetzen', self.resetImg, None, 'icons/quit.png', u'Markierungen des aktuellen Bildes zurücksetzen', enabled=True)
-        # copy = action('&Duplicate\nRectBox', self.copySelectedShape, 'Ctrl+D', 'copy', u'Create a duplicate of the selected Box', enabled=False)
-        # advancedMode = action('&Advanced Mode', self.toggleAdvancedMode, 'Ctrl+Shift+A', 'expert', u'Switch to advanced mode', checkable=True)
-        #hideAll = action('&Hide\nRectBox', partial(self.togglePolygons, False), 'Ctrl+H', 'hide', u'Hide all Boxs', enabled=False)
-        #showAll = action('&Show\nRectBox', partial(self.togglePolygons, True),'Ctrl+A', 'hide', u'Show all Boxs', enabled=False)
         segmentationOverlay = action('Segmentierung einblenden', self.toggleSegmentationOverlay, None, 'Overlay einblenden', u'Segmentierung einblenden', checkable=True, enabled=True)
         contourOverlay = action('Kontur erstellen/\neinblenden', self.toggleContourOverlay, None, 'Overlay einblenden', u'Kontur einblenden', checkable=True, enabled=True)
         generateOutput = action('Ergebnis erzeugen', self.genOutput, None, 'icons/labels.png', u'Ergebnisbild erzeugen')
         autoDetect = action('&Automatische\nErkennung', self.cellDetection, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen')
+        autoDetectDir = action('&Automatische\nErkennung des Ordners', self.cellDetectionDir, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen des gesamten Ordners')
 
-        # showInfo = action('&Information', self.showInfoDialog, None, 'help', u'Information')
-
-        # zoom = QWidgetAction(self)
-        # zoom.setDefaultWidget(self.zoomWidget)
-        # self.zoomWidget.setWhatsThis(
-        #     u"Zoom in or out of the image. Also accessible with"
-        #     " %s and %s from the canvas." % (fmtShortcut("Ctrl+[-+]"),
-        #                                      fmtShortcut("Ctrl+Wheel")))
-        # self.zoomWidget.setEnabled(False)
 
         zoomIn = action('Zoom &In', partial(self.addZoom, 10), 'Ctrl++', 'zoom-in', u'Increase zoom level', enabled=False)
         zoomOut = action('&Zoom Out', partial(self.addZoom, -10), 'Ctrl+-', 'zoom-out', u'Decrease zoom level', enabled=False)
@@ -323,7 +293,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Store actions for further handling
         self.actions = struct(save=save, #saveAs=saveAs
-            open=open, close=close, resetSettings = resetSettings,
+            #open=open, 
+            close=close, resetSettings = resetSettings,
                               #lineColor=color1,
                               #create=create,
                               delete=delete,
@@ -331,6 +302,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               createMode=createMode, editMode=editMode,
                               #advancedMode=advancedMode, shapeLineColor=shapeLineColor, shapeFillColor=shapeFillColor,
                               autoDetect=autoDetect,
+                              autoDetectDir=autoDetectDir,
                               #zoom=zoom, zoomIn=zoomIn, zoomOut=zoomOut, zoomOrg=zoomOrg,
                               #fitWindow=fitWindow, fitWidth=fitWidth,
                               zoomActions=zoomActions,
@@ -380,14 +352,6 @@ class MainWindow(QMainWindow, WindowMixin):
         #     #fitWindow, fitWidth))
         addActions(self.menus.overlays, (segmentationOverlay, contourOverlay))
 
-        # self.menus.file.aboutToShow.connect(self.updateFileMenu)
-
-        # Custom context menu for the canvas widget:
-        ## DONE : removed copy action
-        # action('&Copy here', self.copyShape)
-
-
-        #addActions(self.canvas.menus[0], self.actions.beginnerContext)
         addActions(self.canvas.menus[0], self.actions.advancedContext)
         addActions(self.canvas.menus[1], [action('&Move here', self.moveShape)])
 
@@ -395,7 +359,7 @@ class MainWindow(QMainWindow, WindowMixin):
         # self.actions.beginner = (
         #     open, opendir, openNextImg, openPrevImg, autoDetect, save, None, create, delete, None)
 
-        self.actions.advanced = (open, opendir, openNextImg, openPrevImg, autoDetect, save, reload, None, createMode, editMode, delete, generateOutput, None,  resetBoxes, resetSettings)
+        self.actions.advanced = (opendir, openNextImg, openPrevImg, autoDetect, autoDetectDir, save, reload, None, createMode, editMode, delete, generateOutput, None,  resetBoxes, resetSettings)
             #hideAll, showAll)
 
         # Application state.
@@ -476,17 +440,6 @@ class MainWindow(QMainWindow, WindowMixin):
     def noShapes(self):
         return not self.itemsToShapes
 
-    # def toggleAdvancedMode(self, value=True):
-    #     self.canvas.setEditing(True)
-    #     self.populateModeActions()
-    #     self.editButton.setVisible(not value)
-    #     if value:
-    #         self.actions.createMode.setEnabled(True)
-    #         self.actions.editMode.setEnabled(True)
-    #         self.dock.setFeatures(self.dock.features() | self.dockFeatures)
-    #     else:
-    #         self.dock.setFeatures(self.dock.features() ^ self.dockFeatures)
-
     def populateModeActions(self):
         tool, menu = self.actions.advanced, self.actions.advancedContext
         self.tools.clear()
@@ -496,14 +449,6 @@ class MainWindow(QMainWindow, WindowMixin):
         # self.menus.edit.clear()
         actions = (self.actions.createMode, self.actions.editMode)
         # addActions(self.menus.edit, actions + self.actions.editMenu)
-
-    # def setBeginner(self):
-    #     self.tools.clear()
-    #     addActions(self.tools, self.actions.beginner)
-
-    # def setAdvanced(self):
-    #     self.tools.clear()
-    #     addActions(self.tools, self.actions.advanced)
 
     def setDirty(self):
         self.dirty = True
@@ -547,23 +492,9 @@ class MainWindow(QMainWindow, WindowMixin):
             return items[0]
         return None
 
-    # def addRecentFile(self, filePath):
-    #     if filePath in self.recentFiles:
-    #         self.recentFiles.remove(filePath)
-    #     elif len(self.recentFiles) >= self.maxRecent:
-    #         self.recentFiles.pop()
-    #     self.recentFiles.insert(0, filePath)
-
-    # def advanced(self):
-    #     return True
-
     ## Callbacks ##
     # def showTutorialDialog(self):
     #     subprocess.Popen([self.screencastViewer, self.screencast])
-
-    # def showInfoDialog(self):
-    #     msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(__appname__, __version__, sys.version_info)
-    #     QMessageBox.information(self, u'Information', msg)
 
     def createShape(self):
         # assert self.beginner()
@@ -629,45 +560,12 @@ class MainWindow(QMainWindow, WindowMixin):
         # else:
             # self.showContourOverlay = show
         if show:
-            self.renderContourOverlay()
+            self.calcContours()
         self.canvas.showContourOverlay = show
         self.canvas.update()
             # self.renderOverlays()
             # self.reloadImg()
 
-        # print('From Con overlay: {}'.format(self.actions.contourOverlay.isChecked()))
-        #print('contour overlay toggled {}'.format(show))
-
-    # def updateFileMenu(self):
-    #     currFilePath = self.filePath
-
-    #     def exists(filename):
-    #         return os.path.exists(filename)
-    #     menu = self.menus.recentFiles
-    #     menu.clear()
-    #     files = [f for f in self.recentFiles if f !=
-    #              currFilePath and exists(f)]
-    #     for i, f in enumerate(files):
-    #         icon = newIcon('labels')
-    #         action = QAction(
-    #             icon, '&%d %s' % (i + 1, QFileInfo(f).fileName()), self)
-    #         action.triggered.connect(partial(self.loadRecent, f))
-    #         menu.addAction(action)
-
-    # def popLabelListMenu(self, point):
-    #     self.menus.labelList.exec_(self.labelList.mapToGlobal(point))
-
-    # def editLabel(self):
-    #     if not self.canvas.editing():
-    #         return
-    #     item = self.currentItem()
-    #     text = self.labelDialog.popUp(item.text())
-    #     if text is not None:
-    #         item.setText(text)
-    #         item.setBackground(generateColorByText(text))
-    #         self.setDirty()
-
-    # Tzutalin 20160906 : Add file list and dock to move faster
     def fileitemDoubleClicked(self, item=None):
         currIndex = self.mImgList.index(ustr(item.text()))
         if currIndex < len(self.mImgList):
@@ -736,7 +634,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadLabels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult, contour_points in shapes:
+        for label, points, line_color, fill_color, difficult, contour_points, confidence in shapes:
             shape = Shape(label=label)
             for x, y in points:
                 shape.addPoint(QPointF(x, y))
@@ -746,6 +644,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     #print('Cnt: Adding point {0}{1}'.format(x,y))
                     shape.addContourPoint((x, y))
             shape.difficult = difficult
+            shape.confidence = confidence
             shape.close()
             s.append(shape)
             if line_color:
@@ -771,7 +670,8 @@ class MainWindow(QMainWindow, WindowMixin):
                         fill_color=s.fill_color.getRgb(),
                         points=[(p.x(), p.y()) for p in s.points],
                         difficult = s.difficult,
-                        contour_points=s.contour_points)
+                        contour_points=s.contour_points,
+                        confidence=s.confidence)
 
         shapes = [format_shape(shape) for shape in self.canvas.shapes]
         # Can add differrent annotation formats here
@@ -942,20 +842,6 @@ class MainWindow(QMainWindow, WindowMixin):
             fileWidgetItem = self.fileListWidget.item(index)
             fileWidgetItem.setSelected(True)
         if unicodeFilePath and os.path.exists(unicodeFilePath):
-            # if LabelFile.isLabelFile(unicodeFilePath):
-            #     try:
-            #         self.labelFile = LabelFile(unicodeFilePath)
-            #     except LabelFileError as e:
-            #         self.errorMessage(u'Error opening file', (u"<p><b>%s</b></p>" u"<p>Make sure <i>%s</i> is a valid label file.") % (e, unicodeFilePath))
-            #         self.status("Error reading %s" % unicodeFilePath)
-            #         return False
-            #     self.imageData = self.labelFile.imageData
-                # self.lineColor = QColor(*self.labelFile.lineColor)
-                # self.fillColor = QColor(*self.labelFile.fillColor)
-            # else:
-                # Load image:
-                # read data first and store for saving into label file.
-                # self.imageData = read(unicodeFilePath, None)
             # Image now loading with OpenCV function, so it can be modified with OpenCV functions before rendering
             img = read(unicodeFilePath, None)
             # reload image with overlays rendered in it
@@ -1052,10 +938,9 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_WIN_SIZE] = self.size()
         settings[SETTING_WIN_POSE] = self.pos()
         settings[SETTING_WIN_STATE] = self.saveState()
-        # settings[SETTING_LINE_COLOR] = self.lineColor
-        # settings[SETTING_FILL_COLOR] = self.fillColor
+        settings[SETTING_LINE_COLOR] = self.lineColor
+        settings[SETTING_FILL_COLOR] = self.fillColor
         settings[SETTING_RECENT_FILES] = self.recentFiles
-        # settings[SETTING_ADVANCE_MODE] = not self._beginner
         if self.defaultSaveDir and os.path.exists(self.defaultSaveDir):
             settings[SETTING_SAVE_DIR] = ustr(self.defaultSaveDir)
         else:
@@ -1090,14 +975,20 @@ class MainWindow(QMainWindow, WindowMixin):
     def cellDetection(self):
         if not self.mayContinue():
             return
-        localPath = self.filePath.split(os.path.basename(self.filePath))[0]
-        imgFileName = os.path.basename(self.filePath)
-        currentImg = io.imread(self.filePath)
+        print(self.filePath)
+        # if path is None:
+        #     currentPath = self.filePath
+        # else:
+        #     currentPath = path
+        currentPath = self.filePath
+        localPath = self.filePath.split(os.path.basename(currentPath))[0]
+        imgFileName = os.path.basename(currentPath)
+        currentImg = io.imread(currentPath)
         if isinstance(self.detector, YOLODetector):
             boxes = self.detector.predictBoxes(currentImg)
             height, width, depth = currentImg.shape
-            filename = self.filePath.split('.')[0] + '.xml'
-            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=self.filePath)
+            filename = currentPath.split('.')[0] + '.xml'
+            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=currentPath)
             writer.verified = False
             for box in boxes:
                 if box.classes[0] > OBJ_THRESH:
@@ -1105,14 +996,15 @@ class MainWindow(QMainWindow, WindowMixin):
                     ymin = int(box.ymin)
                     xmax = int(box.xmax)
                     ymax = int(box.ymax)
-                    writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, [])
+                    confidence = box.get_score()
+                    writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, [], confidence)
                 else:
                     continue
         elif isinstance(self.detector, MaskRCNNDetector):
             boxes = self.detector.predictBoxesAndContour(currentImg)
             height, width, depth = currentImg.shape
-            filename = self.filePath.split('.')[0] + '.xml'
-            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=self.filePath)
+            filename = currentPath.split('.')[0] + '.xml'
+            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=currentPath)
             writer.verified = False
             for box in boxes:
                 xmin = box.xmin
@@ -1120,37 +1012,29 @@ class MainWindow(QMainWindow, WindowMixin):
                 ymin = box.ymin
                 ymax = box.ymax
                 contour = box.contour
-                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, contour)
+                confidence = box.confidence
+                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, contour, confidence)
         writer.save(targetFile=filename)
-        self.loadRecent(self.filePath, True)
+        self.loadRecent(currentPath, True)
 
-    # def sliceCells(self):
-    #     slices = dict()
-    #     if self.filePath is not None:
-    #         img = cv2.imread(self.filePath, cv2.IMREAD_COLOR)
-    #         #anno_file = self.filePath.split('.')[0] + '.xml'
-    #     else:
-    #         return None
-    #     # print(self.filePath, anno_file)
-    #     # if not os.path.exists(anno_file):
-    #     #     return None
-    #     # root = ET.parse(anno_file).getroot()
-    #     # objects = root.findall('object') 
-    #     # # print(len(objects))
-    #     # for i, o in enumerate(objects):
-    #     #     xmin = int(o.findall('bndbox')[0].findall('xmin')[0].text)
-    #     #     xmax = int(o.findall('bndbox')[0].findall('xmax')[0].text)
-    #     #     ymin = int(o.findall('bndbox')[0].findall('ymin')[0].text)
-    #     #     ymax = int(o.findall('bndbox')[0].findall('ymax')[0].text)
-    #         # slices[i] = {'data' : img[ymin:ymax+1, xmin:xmax+1, :], 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax}
-    #     for i, s in enumerate(self.canvas.shapes):
-    #         xmin, ymin = int(s.points[0].x()), int(s.points[0].y())
-    #         xmax, ymax = int(s.points[2].x()), int(s.points[2].y())
-    #         slices[i] = {'data' : img[ymin:ymax+1, xmin:xmax+1, :], 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax}
-    #     # print(slices)
-    #     return slices
+    def cellDetectionDir(self):
+        # print(self.mImgList)
+        progress = QProgressDialog('Erkenne Zellen {0}/{1}'.format(0, len(self.mImgList)) , None, 0, 0, self)
+        progress.setWindowTitle('Bitte warten')
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setRange(0, len(self.mImgList))
+        progress.setValue(0)
+        progress.forceShow()
+        for p in self.mImgList:
+            progress.setLabelText('Erkenne Zellen {0}/{1}'.format(progress.value() + 1, len(self.mImgList)))
+            progress.forceShow()
+            self.filePath = p
+            self.cellDetection()
+            progress.setValue(progress.value() + 1)
+        progress.close()
+        progress = QMessageBox.information(self, u'Information', 'Erkennnung der Zellen abgeschlossen')
     
-    def renderContourOverlay(self):
+    def calcContours(self):
         # from OpenCV contour examples
         rendered = False
         if not self.canvas.shapes:
@@ -1168,12 +1052,20 @@ class MainWindow(QMainWindow, WindowMixin):
                     points = self.canvas.shapes[i].contour_points
                 else:
                     rendered = True
-                    print('Rendering')
                     img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                    try:
+                        assert_nD(img, 2)
+                        if img.shape[0] <= 1 or img.shape[1] <= 1:
+                            raise ValueError('Box ist vertikale oder horizontale Linie')
+                    except ValueError as e:
+                        print(e)
+                        print(img, xmin, xmax, ymin, ymax)
+                        print('Möglicherweise konnten nicht alle Konturen berechnet werden')
+                        self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden (0)')
+                        self.statusBar().show()
+                        continue
+                    print('Rendering {0}'.format(img.shape))
                     img = enhance_contrast(img, disk(15))
-
-                    #outer_contour_bin = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
-                    #sep_img = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
                     image = img_as_float(img)
                     init_ls = checkerboard_level_set(image.shape, 3)
                     ls = morphological_chan_vese(image, 35, init_level_set=init_ls, smoothing=1)
@@ -1195,7 +1087,8 @@ class MainWindow(QMainWindow, WindowMixin):
                     elif dv_line[left] > 0 and dv_line[right] < 0:
                         v = 0
                     else:
-                        # print('Skipping contouring')
+                        self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden (1)')
+                        self.statusBar().show()
                         continue
                     ls[0:5, :] = v
                     ls[-5:, :] = v
@@ -1209,9 +1102,6 @@ class MainWindow(QMainWindow, WindowMixin):
                                 continue
                             d_line = (d_line / d_line.max()).astype(np.uint8)
                             x_left, x_right = np.where(d_line == 1)[0][0], np.where(d_line == 1)[0][-1]
-                            #outerContour[y, x_left] = [255, 0, 0]
-                            #outerContour[y, x_right] = [255, 0, 0]
-                            #sep_img[y, x_left:x_right+1] = 1
                             left_side.append((y, x_left))
                             right_side.append((y, x_right))
                         except Exception as e:
@@ -1224,50 +1114,19 @@ class MainWindow(QMainWindow, WindowMixin):
                                 continue
                             d_line = (d_line / d_line.max()).astype(np.uint8)
                             y_top, y_bottom = np.where(d_line == 1)[0][0], np.where(d_line == 1)[0][-1]
-                            #outer_contour_x[y_top, x] = [255, 0, 0]
-                            #outer_contour_x[y_bottom, x] = [255, 0, 0]
-                            #sep_img[y_top:y_bottom+1, x] = 1
                             top_side.append((y_top, x))
                             bottom_side.append((y_bottom, x))
                         except Exception as e:
                             continue
 
-                    points = [x for x in left_side+list(reversed(right_side)) if x in top_side+list(reversed(bottom_side))]
-                # print(points)
-                for p in range(len(points)-1):
-                    try:
-                        r0, c0 = points[p]
-                        r1, c1 = points[p+1]
-                        # print(r0, c0, r1, c1)
-                        rr, cc = line(int(r0), int(c0), int(r1), int(c1))
-                        #outer_contour_bin[rr, cc] = 1
-                        outerContour[rr, cc] = [255, 0, 0]
-                    except Exception as e:
-                        # print(e)
-                        continue
-                    r0, c0 = points[-1]
-                    r1, c1 = points[0]
-                    rr, cc = line(int(r0), int(c0), int(r1), int(c1))
-                    #outer_contour_bin[rr, cc] = 1
-                    outerContour[rr, cc] = [255, 0, 0]
-                outerContour[0:2, :] = outerContour.min()
-                outerContour[-2:, :] = outerContour.min()
-                outerContour[: , 0:2] = outerContour.min()
-                outerContour[: ,-2:] = outerContour.min()
-                outerContour = cv2.dilate(outerContour, np.ones((3,3)))
-                if outerContour.shape == contourOverlay[ymin:ymax+1, xmin:xmax+1, :].shape:
-                    contourOverlay[ymin:ymax+1, xmin:xmax+1, :] = outerContour
-                    if len(points) < 10:
-                        self.canvas.shapes[i].contour_points = list()
-                    else:
-                        self.canvas.shapes[i].contour_points = points.copy()
-                    # print(self.canvas.shapes[i].contour_points)
+                    # points = [x for x in left_side+list(reversed(right_side)) if x in top_side+list(reversed(bottom_side))]
+                    points = [x for i, x in enumerate(left_side+list(reversed(right_side))) if (x in top_side+list(reversed(bottom_side)) and i % 3 == 0)]
+                if len(points) < 5:
+                    self.canvas.shapes[i].contour_points = list()
                 else:
-                    continue
-        # cv2.imwrite('contourOverlay.jpg', contourOverlay)
+                    self.canvas.shapes[i].contour_points = points.copy()
         if rendered: 
             self.saveFile()
-        return contourOverlay
 
     def renderSegmentationOverlay(self):
         # from OpenCV watershed example algorithm
@@ -1318,44 +1177,54 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def renderOverlays(self):
         if self.showSegmentationOverlay:
-            # print('Loading image with added segmentation overlay')
-            # self.segmentationOverlay = self.renderSegmentationOverlay(self.sliceCells())
             self.segmentationOverlay = self.renderSegmentationOverlay()
         else:
             self.segmentationOverlay = None
 
-        # if self.showContourOverlay:
-            # print('Loading image with added contour overlay')
-            # self.contourOverlay = self.renderContourOverlay(self.sliceCells())
-            # self.contourOverlay = self.renderContourOverlay()
-        # else:
-            # self.contourOverlay = None
-
-        # self.reloadImg()
     def genOutput(self):
-        if self.filePath is not None and self.canvas.shapes:
-            file = Image.open(self.filePath)
-            draw = ImageDraw.Draw(file)
-            font = ImageFont.truetype('UbuntuMono.ttf', 30)
-            for i, s in enumerate(self.canvas.shapes):
-                xmin, xmax, ymin, ymax = s.points[0].x(), s.points[2].x(), s.points[0].y(), s.points[2].y()
-                height, width = int(xmax - xmin), int(ymax - ymin)
-                img = np.zeros((width, height)).astype(np.uint8)
-                if not s.contour_points:
-                    continue
-                else:
-                    points = np.asarray([(int(y), int(x)) for y, x in s.contour_points])
-                    polygon_points = [(int(x+xmin), int(y+ymin)) for y, x in s.contour_points]
-                    for y in range(img.shape[0]):
-                        for x in range(img.shape[1]):
-                            if cv2.pointPolygonTest(points, (y, x), False) != -1.0:
-                                img[y,x] = 1
-                    area = img.sum()
-                    draw.text((int(xmax), int(ymin)), "{}".format(area), fill=(0,0,0,255), font=font)
-                    draw.polygon(polygon_points, outline=(255,255,0,255))
-            draw.text((10, 10), str(len(self.canvas.shapes)), fill=(0,0,0,255), font=font)
-            fileName = self.filePath.split('.')[0] + '_done' + '.jpg'
-            file.save(fileName)
+        excel_filename = 'Zystenauswertung.xlsx'
+        if self.dirname is None: 
+            return
+        tableGenerator = cellTableGenerator(self.dirname + '/' + excel_filename)
+        progress = QProgressDialog('Erkenne Zellen {0}/{1}'.format(0, len(self.mImgList)) , None, 0, 0, self)
+        progress.setWindowTitle('Bitte warten')
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setRange(0, len(self.mImgList))
+        progress.setValue(0)
+        progress.forceShow()
+        for p in self.mImgList:
+            marked_img_list = list()
+            anno_file = p.split('.')[0] + '.xml'
+            if not os.path.exists(anno_file):
+                continue
+            else:
+                progress.setLabelText('Erzeuge Ergebnis {0}/{1}'.format(progress.value() + 1, len(self.mImgList)))
+                progress.forceShow()
+                self.filePath = p
+                self.loadFile(self.filePath)
+                draw_file = Image.open(self.filePath)
+                draw = ImageDraw.Draw(draw_file)
+                font = ImageFont.truetype('UbuntuMono.ttf', 30)
+                image_filename = self.filePath.split('/')[-1]
+                for i, s in enumerate(self.canvas.shapes):
+                    xmin, xmax, ymin, ymax = s.points[0].x(), s.points[2].x(), s.points[0].y(), s.points[2].y()
+                    if not s.contour_points:
+                        continue
+                    else:
+                        polygon_points = [(int(x+xmin), int(y+ymin)) for y, x in s.contour_points]
+                        polygon = Polygon([(int(y), int(x)) for y, x in s.contour_points])
+                        r = polygon.length / (2*np.pi)  # polygon.length is defined as perimeter of polygon shape
+                        V = (4/3) * np.pi * (r**3)
+                        tableGenerator.add_cell(i+1, image_filename, polygon.area, polygon.length, r, V)
+                        draw.text((int(xmax), int(ymin)), "{}".format(polygon.area), fill=(0,0,0,255), font=font)
+                        draw.text((int(xmin), int(ymin)), "{}".format(i+1), fill=(0,0,0,255), font=font)
+                        draw.polygon(polygon_points, outline=(255,255,0,255))
+                draw.text((10, 10), str(len(self.canvas.shapes)), fill=(0,0,0,255), font=font)
+                draw_file.save(self.filePath.split('.')[0] + '_done' + '.jpg')
+                progress.setValue(progress.value() + 1)
+        progress.close()
+        tableGenerator.close()
+        info = QMessageBox.information(self, u'Information', 'Ergebnis wurde in {0} erzeugt'.format(excel_filename))
 
 
     def loadRecent(self, filename, cellDetection=False):
@@ -1375,39 +1244,6 @@ class MainWindow(QMainWindow, WindowMixin):
                     images.append(path)
         images.sort(key=lambda x: x.lower())
         return images
-
-    # def changeSavedirDialog(self, _value=False):
-    #     if self.defaultSaveDir is not None:
-    #         path = ustr(self.defaultSaveDir)
-    #     else:
-    #         path = '.'
-
-    #     # dirpath = ustr(QFileDialog.getExistingDirectory(self,
-    #     #                                                '%s - Save annotations to the directory' % __appname__, path,  QFileDialog.ShowDirsOnly
-    #     #                                                | QFileDialog.DontResolveSymlinks))
-
-    #     # if dirpath is not None and len(dirpath) > 1:
-    #     #     self.defaultSaveDir = dirpath
-
-    #     self.statusBar().showMessage('%s . Annotation will be saved to %s' %
-    #                                  ('Change saved folder', self.defaultSaveDir))
-    #     self.statusBar().show()
-
-    # def openAnnotationDialog(self, _value=False):
-    #     if self.filePath is None:
-    #         self.statusBar().showMessage('Please select image first')
-    #         self.statusBar().show()
-    #         return
-
-    #     path = os.path.dirname(ustr(self.filePath))\
-    #         if self.filePath else '.'
-    #     if self.usingPascalVocFormat:
-    #         filters = "Open Annotation XML file (%s)" % ' '.join(['*.xml'])
-    #         filename = ustr(QFileDialog.getOpenFileName(self,'%s - Choose a xml file' % __appname__, path, filters))
-    #         if filename:
-    #             if isinstance(filename, (tuple, list)):
-    #                 filename = filename[0]
-    #         self.loadPascalXMLByFilename(filename)
 
     def openDirDialog(self, _value=False, dirpath=None):
         if self.dirty:
@@ -1432,21 +1268,6 @@ class MainWindow(QMainWindow, WindowMixin):
         for imgPath in self.mImgList:
             item = QListWidgetItem(imgPath)
             self.fileListWidget.addItem(item)
-
-    # def verifyImg(self, _value=False):
-    #     # Proceding next image without dialog if having any label
-    #      if self.filePath is not None:
-    #         try:
-    #             self.labelFile.toggleVerify()
-    #         except AttributeError:
-    #             # If the labelling file does not exist yet, create if and
-    #             # re-save it with the verified attribute.
-    #             self.saveFile()
-    #             self.labelFile.toggleVerify()
-
-    #         self.canvas.verified = self.labelFile.verified
-    #         self.paintCanvas()
-    #         self.saveFile()
 
     def openPrevImg(self, _value=False):
         # Proceding prev image without dialog if having any label
@@ -1508,13 +1329,6 @@ class MainWindow(QMainWindow, WindowMixin):
             self.loadFile(filename)
 
     def saveFile(self, _value=False):
-        # if self.defaultSaveDir is not None and len(ustr(self.defaultSaveDir)):
-        #     if self.filePath:
-        #         imgFileName = os.path.basename(self.filePath)
-        #         savedFileName = os.path.splitext(imgFileName)[0] + XML_EXT
-        #         savedPath = os.path.join(ustr(self.defaultSaveDir), savedFileName)
-        #         self._saveFile(savedPath)
-        # else:
         imgFileDir = os.path.dirname(self.filePath)
         imgFileName = os.path.basename(self.filePath)
         savedFileName = os.path.splitext(imgFileName)[0] + XML_EXT
@@ -1522,29 +1336,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self._saveFile(savedPath)
             # self._saveFile(savedPath if self.labelFile else self.saveFileDialog())
 
-    # def saveFileAs(self, _value=False):
-    #     assert not self.image.isNull(), "cannot save empty image"
-    #     self._saveFile(self.saveFileDialog())
-
-    # def saveFileDialog(self):
-    #     caption = '%s - Choose File' % __appname__
-    #     filters = 'File (*%s)' % LabelFile.suffix
-    #     openDialogPath = self.currentPath()
-    #     dlg = QFileDialog(self, caption, openDialogPath, filters)
-    #     dlg.setDefaultSuffix(LabelFile.suffix[1:])
-    #     dlg.setAcceptMode(QFileDialog.AcceptSave)
-    #     filenameWithoutExtension = os.path.splitext(self.filePath)[0]
-    #     dlg.selectFile(filenameWithoutExtension)
-    #     dlg.setOption(QFileDialog.DontUseNativeDialog, False)
-    #     if dlg.exec_():
-    #         return dlg.selectedFiles()[0]
-    #     return ''
-
     def _saveFile(self, annotationFilePath):
         if annotationFilePath and self.saveLabels(annotationFilePath):
             self.setClean()
-            self.statusBar().showMessage('Saved to  %s' % annotationFilePath)
-            self.statusBar().show()
+            # self.statusBar().showMessage('Saved to  %s' % annotationFilePath)
+            # self.statusBar().show()
 
     def closeFile(self, _value=False):
         if self.dirty:
@@ -1598,30 +1394,11 @@ class MainWindow(QMainWindow, WindowMixin):
     def deleteSelectedShape(self):
         self.toggleDrawMode(True)
         self.remLabel(self.canvas.deleteSelected())
-        self.setDirty()
+        self.saveFile()
+        # self.setDirty()
         # if self.noShapes():
             # for action in self.actions.onShapesPresent:
             #     action.setEnabled(False)
-
-    # def chshapeLineColor(self):
-    #     color = self.colorDialog.getColor(self.lineColor, u'Choose line color',
-    #                                       default=DEFAULT_LINE_COLOR)
-    #     if color:
-    #         self.canvas.selectedShape.line_color = color
-    #         self.setDirty()
-
-    # def chshapeFillColor(self):
-    #     color = self.colorDialog.getColor(self.fillColor, u'Choose fill color',
-    #                                       default=DEFAULT_FILL_COLOR)
-    #     if color:
-    #         self.canvas.selectedShape.fill_color = color
-    #         self.canvas.update()
-    #         self.setDirty()
-
-    # def copyShape(self):
-    #     self.canvas.endMove(copy=True)
-    #     self.addLabel(self.canvas.selectedShape)
-    #     self.setDirty()
 
     def moveShape(self):
         self.canvas.endMove(copy=False)
@@ -1649,8 +1426,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.verified = tVocParseReader.verified
 
 
-def inverted(color):
-    return QColor(*[255 - v for v in color.getRgb()])
+# def inverted(color):
+#     return QColor(*[255 - v for v in color.getRgb()])
 
 
 def read(filename, default=None):
