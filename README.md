@@ -28,7 +28,7 @@ In medical research of PCKD it is useful to mark and calculate the area and volu
 
 `shapely>=1.6.4.post2`
 
-If i forgot something to mention, install it on yourself and leave a issue for me! 
+If i forgot something to mention, install it on yourself and leave an issue for me! 
 
 Once you installed all needed packages, you can just simply start the tool by entering the folder and type `python3 main.py`. 
 
