@@ -11,6 +11,7 @@ import sys
 
 # DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
 DEFAULT_LINE_COLOR = QColor(255, 255, 255, 255)
+DEFAULT_LINE_COLOR_EDITED = QColor(255, 0, 0, 255)
 # DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
 DEFAULT_FILL_COLOR = QColor(255, 255, 255, 255)
 DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255, 255)
@@ -31,6 +32,7 @@ class Shape(object):
     # of _all_ shape objects.
     line_color = DEFAULT_LINE_COLOR
     fill_color = DEFAULT_FILL_COLOR
+    line_color_edited = DEFAULT_LINE_COLOR_EDITED
     select_line_color = DEFAULT_SELECT_LINE_COLOR
     select_fill_color = DEFAULT_SELECT_FILL_COLOR
     vertex_fill_color = DEFAULT_VERTEX_FILL_COLOR
@@ -48,6 +50,7 @@ class Shape(object):
         self.fill = False
         self.selected = False
         self.difficult = difficult
+        self.contourEdited = False
 
         self._highlightIndex = None
         self._highlightMode = self.NEAR_VERTEX
@@ -92,7 +95,13 @@ class Shape(object):
 
     def paint(self, painter):
         if self.points:
-            color = self.select_line_color if self.selected else self.line_color
+            # color = self.select_line_color if self.selected else self.line_color
+            if self.selected:
+                color = self.select_line_color
+            elif not self.selected and self.contourEdited:
+                color = self.line_color_edited
+            else:
+                color = self.line_color
             pen = QPen(color)
             pen.setWidth(max(1, int(round(2.0 / self.scale))))
             painter.setPen(pen)

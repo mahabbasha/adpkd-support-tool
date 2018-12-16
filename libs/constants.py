@@ -11,3 +11,5 @@ SETTING_SAVE_DIR = 'savedir'
 SETTING_LAST_OPEN_DIR = 'lastOpenDir'
 SETTING_AUTO_SAVE = 'autosave'
 SETTING_SINGLE_CLASS = 'singleclass'
+SETTING_PIXEL_SCALING = 'pixelscale'
+SETTING_UNET_USAGE = True

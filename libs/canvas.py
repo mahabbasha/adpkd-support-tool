@@ -45,6 +45,9 @@ class Canvas(QWidget):
         self.current = None
         self.selectedShape = None  # save the selected shape here
         self.selectedShapeCopy = None
+        self.globalMousePos = None
+        self.memIdx = list()
+        self.currentIdx = 0  # only needed for toggling between multiple overlaying cells
         # self.drawingLineColor = QColor(0, 0, 255)
         # self.drawingRectColor = QColor(0, 0, 255)
         self.drawingLineColor = QColor(255, 255, 255, 255)
@@ -111,7 +114,7 @@ class Canvas(QWidget):
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
         pos = self.transformPos(ev.pos())
-
+        self.globalMousePos = pos
         # Update coordinates in status bar if image is opened
         window = self.parent().window()
         if window.filePath is not None:
@@ -687,6 +690,7 @@ class Canvas(QWidget):
             print('Entering contour mode')
         elif key == Qt.Key_Q and self.selectedShape and self.contourMode:
             self.contourMode = False
+            self.selectedShape.contourEdited = True
             self.deSelectShape()
             print('Leaving contour mode')
             self.saveFileSignal.emit()
@@ -697,6 +701,24 @@ class Canvas(QWidget):
         elif key == Qt.Key_R and self.selectedShape and self.contourMode:
             self.selectedShape.contour_points = list()
             self.update()
+        elif key == Qt.Key_F and not self.contourMode:
+            pos = self.globalMousePos
+            shapesIdx = list()
+            for s in self.shapes:
+                if s.containsPoint(pos):
+                    shapesIdx.append(self.shapes.index(s))
+            if len(shapesIdx) >= 2:
+                if sorted(self.memIdx) != sorted(shapesIdx):
+                    self.memIdx = shapesIdx
+                    self.currentIdx = 0
+                else: 
+                    self.currentIdx += 1
+                i = self.memIdx[self.currentIdx%len(self.memIdx)]
+                if self.selectedShape != self.shapes[i]: 
+                    self.deSelectShape()
+                    self.selectShape(self.shapes[i])
+                    self.update()
+        return
 
     def genContourInShape(self, shape):
         genContour = list()
@@ -807,4 +829,6 @@ class Canvas(QWidget):
     def resetState(self):
         self.restoreCursor()
         self.pixmap = None
+        self.memIdx = list()
+        self.currentIdx = 0
         self.update()

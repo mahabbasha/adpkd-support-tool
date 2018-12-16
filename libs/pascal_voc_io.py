@@ -75,12 +75,13 @@ class PascalVocWriter:
         segmented.text = '0'
         return top
 
-    def addBndBox(self, xmin, ymin, xmax, ymax, name, difficult, contour_points, confidence):
+    def addBndBox(self, xmin, ymin, xmax, ymax, name, difficult, contour_points, confidence, contourEdited):
         bndbox = {'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax}
         bndbox['name'] = name
         bndbox['difficult'] = difficult
         bndbox['contour_points'] = contour_points
         bndbox['confidence'] = confidence
+        bndbox['contourEdited'] = contourEdited
         self.boxlist.append(bndbox)
 
     def appendObjects(self, top):
@@ -116,6 +117,8 @@ class PascalVocWriter:
             contour.text = str(each_object['contour_points'])
             confidence = SubElement(bndbox, 'confidence')
             confidence.text = str(each_object['confidence'])
+            contourEdited = SubElement(bndbox, 'contourEdited')
+            contourEdited.text = str(each_object['contourEdited'])
 
     def save(self, targetFile=None):
         root = self.genXML()
@@ -162,8 +165,12 @@ class PascalVocReader:
             confidence = float(bndbox.find('confidence').text)
         except Exception as e:
             confidence = 1.00
+        try:
+            contourEdited = ast.literal_eval(bndbox.find('contourEdited').text)
+        except Exception as e:
+            contourEdited = False
         points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
-        self.shapes.append((label, points, None, None, difficult, contour_points, confidence))
+        self.shapes.append((label, points, None, None, difficult, contour_points, confidence, contourEdited))
 
     def parseXML(self):
         assert self.filepath.endswith(XML_EXT), "Unsupport file format"
