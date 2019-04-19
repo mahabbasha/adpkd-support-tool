@@ -16,8 +16,6 @@ In medical research of PCKD it is useful to mark and calculate the area and volu
 
 `keras==2.0.8`
 
-`OpenCV >= 3.4.0`
-
 `skimage>=0.14dev`
 
 `PyQt5`

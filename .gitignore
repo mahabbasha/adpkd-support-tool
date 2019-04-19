@@ -1,3 +1,6 @@
+*.sublime*
+*.code*
+applog.txt
 *.h5
 *.hdf5
 *.pkl

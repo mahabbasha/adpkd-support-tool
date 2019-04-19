@@ -5,6 +5,7 @@ import codecs
 import os
 import os.path
 import platform
+import logging
 # import re
 # import subprocess
 import sys
@@ -14,11 +15,12 @@ import glob
 from functools import partial
 from PIL import Image, ImageFont, ImageDraw
 
-import cv2
+# import cv2
 import numpy as np
 
 # import skimage
 from skimage import io
+from skimage.color import rgb2gray
 from skimage import img_as_float
 from skimage.segmentation import morphological_chan_vese, checkerboard_level_set
 from skimage.filters.rank import enhance_contrast
@@ -26,6 +28,8 @@ from skimage.morphology import disk
 from skimage._shared.utils import assert_nD
 # from skimage.draw import line, line_aa
 from shapely.geometry import Polygon
+
+
 
 try:
     from PyQt5.QtGui import *
@@ -68,14 +72,12 @@ from libs.ustr import ustr
 # from libs.version import __version__
 from libs.zoomWidget import ZoomWidget
 
-from libs.detection import YOLODetector, OBJ_THRESH
+from libs.detection import OBJ_THRESH
 from libs.detection import MaskRCNNDetector
 from libs.detection import UNetSegmentation
 from libs.excelExport import cellTableGenerator, scaleDialog
 
 __appname__ = 'ADPKD Support Tool'
-
-# Utility functions and classes.
 
 
 def have_qstring():
@@ -94,7 +96,6 @@ class WindowMixin(object):
             self._menu_bar = QMenuBar()
         else:
             self._menu_bar = self.menuBar()
-        # menu = self.menuBar().addMenu(title)
         menu = self._menu_bar.addMenu(title)
         if actions:
             addActions(menu, actions)
@@ -103,7 +104,6 @@ class WindowMixin(object):
     def toolbar(self, title, actions=None):
         toolbar = ToolBar(title)
         toolbar.setObjectName(u'%sToolBar' % title)
-        # toolbar.setOrientation(Qt.Vertical)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         if actions:
             addActions(toolbar, actions)
@@ -134,7 +134,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings = self.settings
         # self.mask_model_weights = 'yolo3_cells_2.h5'
         self.mask_model_weights = 'mask_rcnn_cell_0030_4.h5'
-        self.unet_model_weights = 'unet_cells.hdf5'
+        self.unet_model_weights = 'unet_cells_2.hdf5'
         # Save as Pascal voc xml
         self.defaultSaveDir = None
         self.usingPascalVocFormat = True
@@ -164,7 +164,6 @@ class MainWindow(QMainWindow, WindowMixin):
         listLayout = QVBoxLayout()
         listLayout.setContentsMargins(0, 0, 0, 0)
 
-        # Create a widget for using default label
         self.useDefaultLabelCheckbox = QCheckBox(u'Use default label')
         self.useDefaultLabelCheckbox.setChecked(False)
         self.defaultLabelTextLine = QLineEdit()
@@ -175,18 +174,18 @@ class MainWindow(QMainWindow, WindowMixin):
         useDefaultLabelContainer.setLayout(useDefaultLabelQHBoxLayout)
 
         # Create a widget for edit and diffc button
-        self.diffcButton = QCheckBox(u'difficult')
-        self.diffcButton.setChecked(False)
-        self.diffcButton.stateChanged.connect(self.btnstate)
+        # self.diffcButton = QCheckBox(u'difficult')
+        # self.diffcButton.setChecked(False)
+        # self.diffcButton.stateChanged.connect(self.btnstate)
         self.editButton = QToolButton()
         self.editButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         # Add some of widgets to listLayout
-        listLayout.addWidget(self.editButton)
-        listLayout.addWidget(self.diffcButton)
+        # listLayout.addWidget(self.editButton)
+        # listLayout.addWidget(self.diffcButton)
         listLayout.addWidget(useDefaultLabelContainer)
 
-        # Tzutalin 20160906 : Add file list and dock to move faster
+        
         self.fileListWidget = QListWidget()
         self.fileListWidget.itemDoubleClicked.connect(self.fileitemDoubleClicked)
         filelistLayout = QVBoxLayout()
@@ -229,11 +228,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.dockFeatures = QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetFloatable
         # self.dock.setFeatures(self.dock.features() ^ self.dockFeatures)
-        self.showSegmentationOverlay = None
-        self.segmentationOverlay = None
+        # self.showSegmentationOverlay = None
+        # self.segmentationOverlay = None
         # Custom Cell Detector
 
-        # self.detector = YOLODetector(self.mask_model_weights)
         self.detector = MaskRCNNDetector(self.mask_model_weights)
         self.unet_seg = UNetSegmentation(self.unet_model_weights)
         # Actions
@@ -250,7 +248,6 @@ class MainWindow(QMainWindow, WindowMixin):
         delete = action('&Markierungen\nlöschen', self.deleteSelectedShape, 'delete', 'icons/delete.png', u'Löschen', enabled=False)
         reload = action('&Bild neu laden', self.reloadImg, 'Ctrl+R', 'icons/verify.png', u'Aktuelle Bild neu laden', enabled=True)
         resetBoxes = action('&Markierungen\nzurücksetzen', self.resetImg, None, 'icons/quit.png', u'Markierungen des aktuellen Bildes zurücksetzen', enabled=True)
-        segmentationOverlay = action('Segmentierung einblenden', self.toggleSegmentationOverlay, None, 'Overlay einblenden', u'Segmentierung einblenden', checkable=True, enabled=False)
         contourOverlay = action('Konturmodus', self.toggleContourOverlay, 'Ctrl+Shift+C', 'Overlay einblenden', u'Kontur einblenden', checkable=True, enabled=True)
         unet_usage = action('UNet verwenden', self.toggleUnet, None, 'UNet zum Segmentieren verwenden', u'UNet verwenden', checkable=True, enabled=True, checked=True)
         generateOutput = action('Ergebnis erzeugen', self.genOutput, None, 'icons/labels.png', u'Ergebnisbild erzeugen')
@@ -281,7 +278,7 @@ class MainWindow(QMainWindow, WindowMixin):
         autoDetectDir=autoDetectDir,
         zoomActions=zoomActions,
         generateOutput=generateOutput,
-        segmentationOverlay=segmentationOverlay,
+        # segmentationOverlay=segmentationOverlay,
         contourOverlay=contourOverlay,
         advancedContext=(delete, contourOverlay),
         onLoadActive=(close, createMode, editMode))
@@ -289,7 +286,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.menus = struct(
             overlays=self.menu('&Konturen'))
 
-        addActions(self.menus.overlays, (segmentationOverlay, contourOverlay, unet_usage))
+        addActions(self.menus.overlays, (contourOverlay, unet_usage))
         addActions(self.canvas.menus[0], self.actions.advancedContext)
         addActions(self.canvas.menus[1], [action('&Move here', self.moveShape)])
         self.tools = self.toolbar('Tools')
@@ -388,10 +385,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def setClean(self):
         self.dirty = False
         self.actions.save.setEnabled(False)
-        #self.actions.create.setEnabled(True)
 
     def toggleActions(self, value=True):
-        """Enable/Disable widgets which depend on an opened image."""
         for z in self.actions.zoomActions:
             z.setEnabled(value)
         for action in self.actions.onLoadActive:
@@ -404,7 +399,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.statusBar().showMessage(message, delay)
 
     def resetState(self):
-        self.toggleSegmentationOverlay(False, True)
+        # self.toggleSegmentationOverlay(False, True)
         self.actions.contourOverlay.setChecked(self.canvas.showContourOverlay)
         self.itemsToShapes.clear()
         self.shapesToItems.clear()
@@ -416,14 +411,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelCoordinates.clear()
 
     def currentItem(self):
-        #items = self.labelList.selectedItems()
         if items:
             return items[0]
         return None
 
-    ## Callbacks ##
-    # def showTutorialDialog(self):
-    #     subprocess.Popen([self.screencastViewer, self.screencast])
 
     def createShape(self):
         # assert self.beginner()
@@ -431,9 +422,9 @@ class MainWindow(QMainWindow, WindowMixin):
         # self.actions.create.setEnabled(False)
 
     def resetOverlays(self):
-        self.showSegmentationOverlay = False
-        self.segmentationOverlay = None
-        self.actions.segmentationOverlay.setChecked(False)
+        # self.showSegmentationOverlay = False
+        # self.segmentationOverlay = None
+        # self.actions.segmentationOverlay.setChecked(False)
         self.actions.contourOverlay.setChecked(self.canvas.showContourOverlay)
 
     def toggleDrawingSensitive(self, drawing=True):
@@ -449,12 +440,12 @@ class MainWindow(QMainWindow, WindowMixin):
             self.actions.delete.setEnabled(False)
             self.actions.createMode.setEnabled(True)
             self.canvas.restoreCursor()
-            # self.actions.create.setEnabled(True)
+            
 
     def toggleDrawMode(self, edit=True):
         self.canvas.setEditing(edit)
         self.actions.createMode.setEnabled(edit)
-        # self.actions.editMode.setEnabled(not edit)
+        
 
     def setCreateMode(self):
         self.toggleDrawMode(False)
@@ -465,32 +456,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.toggleDrawMode(True)
         self.actions.delete.setEnabled(True)
         self.actions.editMode.setEnabled(False)
-        # self.labelSelectionChanged()
 
-    def toggleSegmentationOverlay(self, show=False, reset=False):
-        # print('Toggle segmentation called: {}'.format(show))
-        if reset:
-            # print('but in Reset Mode, ignoring')
-            return
-        else:
-            self.showSegmentationOverlay = show
-            # self.renderOverlays()
-            self.reloadImg()
-        # print('segmentation overlay toggled {}'.format(show))
 
     def toggleContourOverlay(self, show=False):
-        # print('Toggle contour called: {}'.format(show))
-        # if reset:
-        #     # print('but in Reset Mode, ignoring')
-        #     return
-        # else:
-
         if show:
             self.calcContours()
         self.canvas.showContourOverlay = show
         self.canvas.update()
-            # self.renderOverlays()
-            # self.reloadImg()
 
     def toggleUnet(self, show=True):
         self.unet_usage = show
@@ -507,9 +479,6 @@ class MainWindow(QMainWindow, WindowMixin):
         """ Function to handle difficult examples Update on each object """
         if not self.canvas.editing():
             return
-        # item = self.currentItem()
-        # if not item: # If not selected Item, take the first one
-        #     item = self.labelList.item(self.labelList.count()-1)
         difficult = self.diffcButton.isChecked()
         try:
             shape = self.itemsToShapes[item]
@@ -595,7 +564,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # Can add differrent annotation formats here
         try:
             if self.usingPascalVocFormat is True:
-                print('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
+                # print('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
+                logging.info('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
                 self.labelFile.savePascalVocFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.lineColor.getRgb(), self.fillColor.getRgb())
             else:
                 self.labelFile.save(annotationFilePath, shapes, self.filePath, self.imageData, self.lineColor.getRgb(), self.fillColor.getRgb())
@@ -623,9 +593,6 @@ class MainWindow(QMainWindow, WindowMixin):
         else:  # User probably changed item visibility
             self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
 
-##################################################################################################################################
-##################################################################################################################################
-    # Callback functions:
     def newShape(self):
         """Pop-up and give focus to the label editor.
         position MUST be in global coordinates.
@@ -655,20 +622,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.setZoom(self.zoomWidget.value() + increment)
 
     def zoomRequest(self, delta):
-        # get the current scrollbar positions
-        # calculate the percentages ~ coordinates
         h_bar = self.scrollBars[Qt.Horizontal]
         v_bar = self.scrollBars[Qt.Vertical]
-
-        # get the current maximum, to know the difference after zooming
         h_bar_max = h_bar.maximum()
         v_bar_max = v_bar.maximum()
 
-        # get the cursor position and canvas size
-        # calculate the desired movement from 0 to 1
-        # where 0 = move left
-        #       1 = move right
-        # up and down analogous
         cursor = QCursor()
         pos = cursor.pos()
         relative_pos = QWidget.mapFromGlobal(self, pos)
@@ -676,15 +634,12 @@ class MainWindow(QMainWindow, WindowMixin):
         cursor_y = relative_pos.y()
         w = self.scrollArea.width()
         h = self.scrollArea.height()
-        # the scaling from 0 to 1 has some padding
-        # you don't have to hit the very leftmost pixel for a maximum-left movement
         margin = 0.1
         move_x = (cursor_x - margin * w) / (w - 2 * margin * w)
         move_y = (cursor_y - margin * h) / (h - 2 * margin * h)
-        # clamp the values from 0 to 1
         move_x = min(max(move_x, 0), 1)
         move_y = min(max(move_y, 0), 1)
-        # zoom in
+        
         units = delta / (8 * 15)
         scale = 10
         self.addZoom(scale * units)
@@ -715,12 +670,10 @@ class MainWindow(QMainWindow, WindowMixin):
             item.setCheckState(Qt.Checked if value else Qt.Unchecked)
 
     def loadFile(self, filePath=None, overlays=None):
-        """Load the specified file, or the last opened file if None."""
         self.resetState()
         self.canvas.setEnabled(False)
         if filePath is None:
             filePath = self.settings.get(SETTING_FILENAME)
-        # Make sure that filePath is a regular python string, rather than QString
         filePath = str(filePath)
         unicodeFilePath = ustr(filePath)
         # Highlight the file item
@@ -729,24 +682,14 @@ class MainWindow(QMainWindow, WindowMixin):
             fileWidgetItem = self.fileListWidget.item(index)
             fileWidgetItem.setSelected(True)
         if unicodeFilePath and os.path.exists(unicodeFilePath):
-            # Image now loading with OpenCV function, so it can be modified with OpenCV functions before rendering
             img = read(unicodeFilePath, None)
-            # reload image with overlays rendered in it
-            overlay = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-            overlays = [self.segmentationOverlay]
-            for o in overlays:
-                if o is not None:
-                    overlay = cv2.addWeighted(overlay, 1.0, o, 1.0, 1.0)
-                else:
-                    continue
-            img = cv2.addWeighted(img, 1.0, overlay, 1.0, 0.0)
             height, width, channel = img.shape
             bytesPerLine = 3 * width
             image = QImage(img.data, width, height, bytesPerLine, QImage.Format_RGB888)
             self.labelFile = None
             if image.isNull():
-                self.errorMessage(u'Error opening file', u"<p>Make sure <i>%s</i> is a valid image file." % unicodeFilePath)
-                self.status("Error reading %s" % unicodeFilePath)
+                self.errorMessage(u'Fehler beim Öffnen des Bildes', u"<p>Sicherstellen, dass <i>%s</i> ein zulässiges Format hat." % unicodeFilePath)
+                self.status("Fehler beim Lesen von %s" % unicodeFilePath)
                 return False
             self.status("Loaded %s" % os.path.basename(unicodeFilePath))
             self.image = image
@@ -792,7 +735,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.zoomWidget.setValue(int(100 * value))
 
     def scaleFitWindow(self):
-        """Figure out the size of the pixmap in order to fit the main widget."""
         e = 2.0  # So that no scrollbars are generated.
         w1 = self.centralWidget().width() - e
         h1 = self.centralWidget().height() - e
@@ -836,15 +778,12 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_AUTO_SAVE] = self.autoSaving
         settings[SETTING_SINGLE_CLASS] = self.singleClassMode
         settings.save()
-###############################################################################################################################################
-###############################################################################################################################################
 
-    # User Dialogs
     def reloadImg(self):
         if not self.mayContinue():
             return
-        self.renderOverlays()
-        print('Reload image')
+        # print('Reload image')
+        logging.info('Bild neu laden')
         self.loadFile(self.filePath)
 
     def resetImg(self):
@@ -854,13 +793,15 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.noAnnotationFileDialog()
                 return
         os.remove(anno_file)
-        print('Reset image')
+        # print('Reset image')
+        logging.info('Reset image')
         self.reloadImg()
 
     def cellDetection(self):
         if not self.mayContinue():
             return
-        print(self.filePath)
+        # print(self.filePath)
+        logging.info(self.filePath)
         # if path is None:
         #     currentPath = self.filePath
         # else:
@@ -869,23 +810,7 @@ class MainWindow(QMainWindow, WindowMixin):
         localPath = self.filePath.split(os.path.basename(currentPath))[0]
         imgFileName = os.path.basename(currentPath)
         currentImg = io.imread(currentPath)
-        if isinstance(self.detector, YOLODetector):
-            boxes = self.detector.predictBoxes(currentImg)
-            height, width, depth = currentImg.shape
-            filename = currentPath.split('.')[0] + '.xml'
-            writer = PascalVocWriter('{0}'.format(localPath), imgFileName, [height, width, depth], localImgPath=currentPath)
-            writer.verified = False
-            for box in boxes:
-                if box.classes[0] > OBJ_THRESH:
-                    xmin = int(box.xmin)
-                    ymin = int(box.ymin)
-                    xmax = int(box.xmax)
-                    ymax = int(box.ymax)
-                    confidence = box.get_score()
-                    writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, [], confidence, False)
-                else:
-                    continue
-        elif isinstance(self.detector, MaskRCNNDetector):
+        if isinstance(self.detector, MaskRCNNDetector):
             boxes = self.detector.predictBoxesAndContour(currentImg)
             height, width, depth = currentImg.shape
             filename = currentPath.split('.')[0] + '.xml'
@@ -926,7 +851,8 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         else:
             # contourOverlay = np.zeros((self.image.height(), self.image.width(), 3), dtype=np.uint8)
-            fullImg = cv2.imread(self.filePath, cv2.IMREAD_COLOR)
+            # fullImg = cv2.imread(self.filePath, cv2.IMREAD_COLOR)
+            fullImg = io.imread(self.filePath)
             for i, s in enumerate(self.canvas.shapes):
                 xmin, ymin = int(s.points[0].x()), int(s.points[0].y())
                 xmax, ymax = int(s.points[2].x()), int(s.points[2].y())
@@ -937,138 +863,56 @@ class MainWindow(QMainWindow, WindowMixin):
                     continue
                 else:
                     rendered = True
-                    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                    img = rgb2gray(img)
                     try:
                         assert_nD(img, 2)
                         if img.shape[0] <= 1 or img.shape[1] <= 1:
                             raise ValueError('Box ist vertikale oder horizontale Linie')
                     except ValueError as e:
-                        print(e)
-                        print(img, xmin, xmax, ymin, ymax)
-                        print('Möglicherweise konnten nicht alle Konturen berechnet werden')
-                        self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden (0)')
+                        # print(e)
+                        # print(img, xmin, xmax, ymin, ymax)
+                        # print('Möglicherweise konnten nicht alle Konturen berechnet werden')
+                        logging.error('Not all contours could be calculated:{}{}{}{}{}{}'.format(e, img, xmin, xmax, ymin, ymax))
+                        self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden')
                         self.statusBar().show()
                         continue
                     if self.unet_usage:
-                        print('Calling UNet')
+                        # print('Calling UNet')
+                        logging.info('Calling Unet')
                         points = self.unet_seg.predictContour(img)
                     else:
-                        print('Rendering {0}'.format(img.shape))
+                        # print('Rendering {0}'.format(img.shape))
+                        logging.info('Rendering {0}'.format(img.shape))
                         img = enhance_contrast(img, disk(15))
                         image = img_as_float(img)
-                        init_ls = checkerboard_level_set(image.shape, 3)
-                        ls = morphological_chan_vese(image, 35, init_level_set=init_ls, smoothing=1)
-                        points = list()
-                        left_side, right_side = list(), list()
-                        top_side, bottom_side = list(), list()
-                        v_line = ls[ls.shape[0] // 2, :] * 255
-                        dv_line = cv2.Scharr(v_line, ddepth=-1, dx=0, dy=1)
-                        # dv_line = dv_line / dv_line.max()
-                        try:
-                            left, right = np.where(np.abs(dv_line) > 0)[0][0], np.where(np.abs(dv_line) > 0)[0][-1]
-                        except Exception as e:
-                            right, left = 0, 0
-                            print(e)
-                        # print(dv_line[left], dv_line[right])
-                        # v = 0
-                        if dv_line[left] < 0 and dv_line[right] > 0:
-                            v = 1
-                        elif dv_line[left] > 0 and dv_line[right] < 0:
-                            v = 0
-                        else:
-                            self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden (1)')
-                            self.statusBar().show()
-                            continue
-                        ls[0:5, :] = v
-                        ls[-5:, :] = v
-                        ls[:, 0:5] = v
-                        ls[:, -5:] = v
+                        left_side, right_side, top_side, bottom_side = list(), list(), list(), list()
+                        image = img_as_float(enhance_contrast(img, disk(15)))
+                        ls = morphological_chan_vese(image, 35, init_level_set=checkerboard_level_set(image.shape, 3), smoothing=1).astype(np.uint8)
+                        ls[0:5, :] = 0
+                        ls[-5:, :] = 0
+                        ls[: , 0:5] = 0
+                        ls[: ,-5:] = 0
                         for y in range(ls.shape[0]):
-                            l = ls[y, :] * 255
                             try:
-                                d_line = np.abs(cv2.Scharr(l, ddepth=-1, dx=0, dy=1))
-                                if d_line.max() == 0:
-                                    continue
-                                d_line = (d_line / d_line.max()).astype(np.uint8)
-                                x_left, x_right = np.where(d_line == 1)[0][0], np.where(d_line == 1)[0][-1]
+                                x_left, x_right = np.where(ls[y, :] == 1)[0][0], np.where(ls[y, :] == 1)[0][-1]
                                 left_side.append((y, x_left))
                                 right_side.append((y, x_right))
                             except Exception as e:
                                 continue
                         for x in range(ls.shape[1]):
-                            l = ls[:, x] * 255
                             try:
-                                d_line = np.abs(cv2.Scharr(l, ddepth=-1, dx=0, dy=1))
-                                if d_line.max() == 0:
-                                    continue
-                                d_line = (d_line / d_line.max()).astype(np.uint8)
-                                y_top, y_bottom = np.where(d_line == 1)[0][0], np.where(d_line == 1)[0][-1]
+                                y_top, y_bottom = np.where(ls[:, x] == 1)[0][0], np.where(ls[:, x] == 1)[0][-1]
                                 top_side.append((y_top, x))
                                 bottom_side.append((y_bottom, x))
                             except Exception as e:
                                 continue
-
-                        # points = [x for x in left_side+list(reversed(right_side)) if x in top_side+list(reversed(bottom_side))]
-                        points = [x for i, x in enumerate(left_side + list(reversed(right_side))) if (x in top_side + list(reversed(bottom_side)) and i % 3 == 0)]
+                        points = [x for i, x in enumerate(left_side + list(reversed(right_side))) if (x in top_side + list(reversed(bottom_side)))]
                     if len(points) < 5:
                         self.canvas.shapes[i].contour_points = list()
                     else:
                         self.canvas.shapes[i].contour_points = points.copy()
         if rendered:
             self.saveFile()
-
-    def renderSegmentationOverlay(self):
-        # from OpenCV watershed example algorithm
-        # print(self.image.width(), self.image.height())
-        if self.canvas.shapes == []:
-            return
-        else:
-            fullImg = cv2.imread(self.filePath, cv2.IMREAD_COLOR)
-            # print(self.image.height(), self.image.width())
-            segmentationOverlay = np.zeros((self.image.height(), self.image.width(), 3), dtype=np.uint8)
-            # print(segmentationOverlay.shape)
-            for s in self.canvas.shapes:
-                xmin, ymin = int(s.points[0].x()), int(s.points[0].y())
-                xmax, ymax = int(s.points[2].x()), int(s.points[2].y())
-                img = fullImg[ymin:ymax+1, xmin:xmax+1, :]
-                # print(segmentationOverlay[ymin:ymax+1, xmin:xmax+1, :].shape)
-                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                if gray is None:
-                    continue
-                blur = cv2.GaussianBlur(gray, (3,3), 0)
-                gray = cv2.addWeighted(gray, 1.5, blur, -0.8, 0)
-                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-                kernel = np.ones((3,3), np.uint8)
-                opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
-                sure_bg = cv2.dilate(opening,kernel, iterations=1)
-                dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 3)
-                _, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
-                sure_fg = np.uint8(sure_fg)
-                unknown = cv2.subtract(sure_bg, sure_fg)
-                _, markers = cv2.connectedComponents(sure_fg)
-                markers = markers + 1
-                markers[unknown == 255] = 0
-                markers = cv2.watershed(img, markers)
-                segmentation = np.zeros(img.shape).astype(np.uint8)
-                segmentation[markers == -1] = [0, 255, 0]
-                segmentation[0:1, :] = segmentation.min()
-                segmentation[-1:, :] = segmentation.min()
-                segmentation[: , 0:1] = segmentation.min()
-                segmentation[: ,-1:] = segmentation.min()
-                segmentation = cv2.dilate(segmentation, np.ones((2,2)))
-                # print(segmentation.shape, segmentationOverlay[ymin:ymax+1, xmin:xmax+1, :].shape, xmin, xmax, ymin, ymax)
-                if segmentation.shape == segmentationOverlay[ymin:ymax+1, xmin:xmax+1, :].shape:
-                    segmentationOverlay[ymin:ymax+1, xmin:xmax+1, :] = segmentation
-                else:
-                    continue
-        # cv2.imwrite('segmentationOverlay.jpg', segmentationOverlay)
-        return segmentationOverlay
-
-    def renderOverlays(self):
-        if self.showSegmentationOverlay:
-            self.segmentationOverlay = self.renderSegmentationOverlay()
-        else:
-            self.segmentationOverlay = None
 
     def genOutput(self):
         if self.dirname is None: 
@@ -1225,8 +1069,8 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         path = os.path.dirname(ustr(self.filePath)) if self.filePath else '.'
         formats = ['*.%s' % fmt.data().decode("ascii").lower() for fmt in QImageReader.supportedImageFormats()]
-        filters = "Image & Label files (%s)" % ' '.join(formats + ['*%s' % LabelFile.suffix])
-        filename = QFileDialog.getOpenFileName(self, '%s - Choose Image or Label file' % __appname__, path, filters)
+        filters = "Bilder (%s)" % ' '.join(formats + ['*%s' % LabelFile.suffix])
+        filename = QFileDialog.getOpenFileName(self, '%s - Bild auswählen' % __appname__, path, filters)
         if filename:
             if isinstance(filename, (tuple, list)):
                 filename = filename[0]
@@ -1307,7 +1151,6 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         if os.path.isfile(xmlPath) is False:
             return
-
         tVocParseReader = PascalVocReader(xmlPath)
         shapes = tVocParseReader.getShapes()
         self.loadLabels(shapes)
@@ -1323,28 +1166,24 @@ def read(filename, default=None):
 
 
 def get_main_app(argv=[]):
-    """
-    Standard boilerplate Qt application code.
-    Do everything but app.exec_() -- so that we can test the application in one thread
-    """
     app = QApplication(argv)
     app.setApplicationName(__appname__)
     app_icon = QIcon()
     app_icon.addFile('icon.png', QSize(225, 225))
     app.setWindowIcon(app_icon)
-    win = MainWindow(argv[1] if len(argv) >= 2 else None,
-                     argv[2] if len(argv) >= 3 else os.path.join(
-                         os.path.dirname(sys.argv[0]),
-                         'data', 'predefined_classes.txt'))
+    win = MainWindow(argv[1] if len(argv) >= 2 else None, argv[2] if len(argv) >= 3 else os.path.join(os.path.dirname(sys.argv[0]),
+                'data', 'predefined_classes.txt'))
     win.show()
     return app, win
 
 
 def main(argv=[]):
-    '''construct main app and run it'''
     app, _win = get_main_app(argv)
     return app.exec_()
 
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='applog.txt', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+    logging.getLogger('tensorflow').disabled = True
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
     sys.exit(main(sys.argv))
