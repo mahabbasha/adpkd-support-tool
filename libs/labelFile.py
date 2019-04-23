@@ -41,12 +41,12 @@ class LabelFile(object):
         for shape in shapes:
             points = shape['points']
             label = shape['label']
-            difficult = int(shape['difficult'])
+            # difficult = int(shape['difficult'])
             contour_points = shape['contour_points']
             confidence = shape['confidence']
             contourEdited = shape['contourEdited']
             bndbox = LabelFile.convertPoints2BndBox(points)
-            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, difficult, contour_points, confidence, contourEdited)
+            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, contour_points, confidence, contourEdited)
 
         writer.save(targetFile=filename)
         return

@@ -41,7 +41,7 @@ class Shape(object):
     point_size = 8
     scale = 1.0
 
-    def __init__(self, label=None, line_color=None, difficult=False, confidence=1.0):
+    def __init__(self, label=None, line_color=None, confidence=1.0):
         self.label = label
         # points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
         self.points = list()
@@ -49,7 +49,7 @@ class Shape(object):
         self.confidence = confidence
         self.fill = False
         self.selected = False
-        self.difficult = difficult
+        # self.difficult = difficult
         self.contourEdited = False
 
         self._highlightIndex = None
@@ -190,7 +190,7 @@ class Shape(object):
             shape.line_color = self.line_color
         if self.fill_color != Shape.fill_color:
             shape.fill_color = self.fill_color
-        shape.difficult = self.difficult
+        # shape.difficult = self.difficult
         return shape
 
     def __len__(self):

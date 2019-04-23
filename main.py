@@ -133,8 +133,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.settings.load()
         settings = self.settings
         # self.mask_model_weights = 'yolo3_cells_2.h5'
-        self.mask_model_weights = 'mask_rcnn_cell_0030_4.h5'
-        self.unet_model_weights = 'unet_cells_2.hdf5'
+        self.mask_model_weights = 'mask_rcnn_cell_0030.h5'
+        self.unet_model_weights = 'unet_cells.hdf5'
         # Save as Pascal voc xml
         self.defaultSaveDir = None
         self.usingPascalVocFormat = True
@@ -302,7 +302,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.fillColor = None
         self.zoom_level = 100
         self.fit_window = False
-        self.difficult = False
+        # self.difficult = False
 
         ## Fix the compatible issue for qt4 and qt5. Convert the QStringList to python list
         if settings.get(SETTING_RECENT_FILES):
@@ -330,8 +330,8 @@ class MainWindow(QMainWindow, WindowMixin):
         Shape.line_color = self.lineColor = DEFAULT_LINE_COLOR
         Shape.fill_color = self.fillColor = DEFAULT_FILL_COLOR
         self.canvas.setDrawingColor(self.lineColor)
-        # Add chris
-        Shape.difficult = self.difficult
+        # # Add chris
+        # Shape.difficult = self.difficult
 
         def xbool(x):
             if isinstance(x, QVariant):
@@ -474,24 +474,23 @@ class MainWindow(QMainWindow, WindowMixin):
             if filename:
                 self.loadFile(filename)
 
-    # Add chris
     def btnstate(self, item=None):
-        """ Function to handle difficult examples Update on each object """
         if not self.canvas.editing():
             return
-        difficult = self.diffcButton.isChecked()
+        # difficult = self.diffcButton.isChecked()
         try:
             shape = self.itemsToShapes[item]
         except:
             pass
         # Checked and Update
         try:
-            if difficult != shape.difficult:
-                shape.difficult = difficult
-                self.setDirty()
-            else:  # User probably changed item visibility
+            # if difficult != shape.difficult:
+            #     shape.difficult = difficult
+            #     self.setDirty()
+            # else:  # User probably changed item visibility
                 self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
-        except:
+        except Exception as e:
+            print(e)
             pass
 
     # React to canvas signals.
@@ -521,14 +520,14 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadLabels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult, contour_points, confidence, contourEdited in shapes:
+        for label, points, line_color, fill_color, contour_points, confidence, contourEdited in shapes:
             shape = Shape(label=label)
             for x, y in points:
                 shape.addPoint(QPointF(x, y))
             if contour_points:
                 for x, y in contour_points:
                     shape.addContourPoint((x, y))
-            shape.difficult = difficult
+            # shape.difficult = difficult
             shape.confidence = confidence
             shape.contourEdited = contourEdited
             shape.close()
@@ -555,7 +554,7 @@ class MainWindow(QMainWindow, WindowMixin):
                         line_color=s.line_color.getRgb(),
                         fill_color=s.fill_color.getRgb(),
                         points=[(p.x(), p.y()) for p in s.points],
-                        difficult=s.difficult,
+                        # difficult=s.difficult,
                         contour_points=s.contour_points,
                         confidence=s.confidence,
                         contourEdited=s.contourEdited)
@@ -580,8 +579,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self._noSelectionSlot = True
             self.canvas.selectShape(self.itemsToShapes[item])
             shape = self.itemsToShapes[item]
-            # Add Chris
-            self.diffcButton.setChecked(shape.difficult)
+            # # Add Chris
+            # self.diffcButton.setChecked(shape.difficult)
 
     def labelItemChanged(self, item):
         shape = self.itemsToShapes[item]
@@ -598,7 +597,7 @@ class MainWindow(QMainWindow, WindowMixin):
         position MUST be in global coordinates.
         """
         text = 'cell'
-        self.diffcButton.setChecked(False)
+        # self.diffcButton.setChecked(False)
         if text is not None:
             generate_color = generateColorByText(text)
             shape = self.canvas.setLastLabel(text, generate_color, generate_color)
@@ -823,7 +822,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 ymax = box.ymax
                 contour = box.contour
                 confidence = box.confidence
-                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', 0, contour, confidence, False)
+                writer.addBndBox(xmin, ymin, xmax, ymax, 'cell', contour, confidence, False)
         writer.save(targetFile=filename)
         self.loadRecent(currentPath, True)
 
