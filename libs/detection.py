@@ -25,7 +25,7 @@ class CellConfig(Config):
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 1  # Background + cell
     STEPS_PER_EPOCH = 100
-    DETECTION_MIN_CONFIDENCE = 0.8
+    DETECTION_MIN_CONFIDENCE = 0.99
 
 class InferenceConfig(CellConfig):
     GPU_COUNT = 1
@@ -129,6 +129,6 @@ class UNetSegmentation:
                     bottom_side.append((y_bottom, x))
                 except Exception as e:
                     continue
-            points = [x for i, x in enumerate(left_side + list(reversed(right_side))) if (x in top_side + list(reversed(bottom_side)))]
+            points = [x for i, x in enumerate(left_side + list(reversed(right_side))) if (x in top_side + list(reversed(bottom_side)) and i%4 == 0)]
             # print(points)
             return points

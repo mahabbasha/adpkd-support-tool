@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import codecs
-# import heapq
 import os
 import os.path
 import platform
 import logging
-# import re
-# import subprocess
 import sys
 import glob
-# import xml.etree.ElementTree as ET
-# from collections import defaultdict
 from functools import partial
 from PIL import Image, ImageFont, ImageDraw
-
-# import cv2
 import numpy as np
-
-# import skimage
 from skimage import io
 from skimage.color import rgb2gray
 from skimage import img_as_float
@@ -26,10 +17,7 @@ from skimage.segmentation import morphological_chan_vese, checkerboard_level_set
 from skimage.filters.rank import enhance_contrast
 from skimage.morphology import disk
 from skimage._shared.utils import assert_nD
-# from skimage.draw import line, line_aa
 from shapely.geometry import Polygon
-
-
 
 try:
     from PyQt5.QtGui import *
@@ -46,8 +34,6 @@ except ImportError:
     from PyQt4.QtGui import *
     from PyQt4.QtCore import *
 
-# import resources
-
 from libs.canvas import Canvas
 from libs.colorDialog import ColorDialog
 from libs.constants import *
@@ -55,10 +41,8 @@ from libs.labelDialog import LabelDialog
 from libs.labelFile import LabelFile
 from libs.labelFile import LabelFileError
 from libs.lib import addActions
-# from libs.lib import fmtShortcut
 from libs.lib import generateColorByText
 from libs.lib import newAction
-# from libs.lib import newIcon
 from libs.lib import struct
 from libs.pascal_voc_io import PascalVocReader
 from libs.pascal_voc_io import PascalVocWriter
@@ -69,9 +53,7 @@ from libs.shape import DEFAULT_LINE_COLOR
 from libs.shape import Shape
 from libs.toolBar import ToolBar
 from libs.ustr import ustr
-# from libs.version import __version__
 from libs.zoomWidget import ZoomWidget
-
 from libs.detection import OBJ_THRESH
 from libs.detection import MaskRCNNDetector
 from libs.detection import UNetSegmentation
@@ -107,7 +89,8 @@ class WindowMixin(object):
         toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         if actions:
             addActions(toolbar, actions)
-        self.addToolBar(Qt.LeftToolBarArea, toolbar)
+        # self.addToolBar(Qt.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.TopToolBarArea, toolbar)
         return toolbar
 
 
@@ -250,9 +233,9 @@ class MainWindow(QMainWindow, WindowMixin):
         resetBoxes = action('&Markierungen\nzurücksetzen', self.resetImg, None, 'icons/quit.png', u'Markierungen des aktuellen Bildes zurücksetzen', enabled=True)
         contourOverlay = action('Konturmodus', self.toggleContourOverlay, 'Ctrl+Shift+C', 'Overlay einblenden', u'Kontur einblenden', checkable=True, enabled=True)
         unet_usage = action('UNet verwenden', self.toggleUnet, None, 'UNet zum Segmentieren verwenden', u'UNet verwenden', checkable=True, enabled=True, checked=True)
-        generateOutput = action('Ergebnis erzeugen', self.genOutput, None, 'icons/labels.png', u'Ergebnisbild erzeugen')
+        generateOutput = action('Ergebnis\n erzeugen', self.genOutput, None, 'icons/labels.png', u'Ergebnisbild erzeugen')
         autoDetect = action('&Automatische\nErkennung', self.cellDetection, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen')
-        autoDetectDir = action('&Automatische\nErkennung des Ordners', self.cellDetectionDir, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen des gesamten Ordners')
+        autoDetectDir = action('&Automatische\nErkennung\n des Ordners', self.cellDetectionDir, None, 'icons/zoom.png', u'Automatische Erkennung von Zellen des gesamten Ordners')
         zoomIn = action('Zoom &In', partial(self.addZoom, 10), 'Ctrl++', 'zoom-in', u'Increase zoom level', enabled=False)
         zoomOut = action('&Zoom Out', partial(self.addZoom, -10), 'Ctrl+-', 'zoom-out', u'Decrease zoom level', enabled=False)
         zoomOrg = action('&Original size', partial(self.setZoom, 100), 'Ctrl+=', 'zoom', u'Zoom to original size', enabled=False)
@@ -288,7 +271,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         addActions(self.menus.overlays, (contourOverlay, unet_usage))
         addActions(self.canvas.menus[0], self.actions.advancedContext)
-        addActions(self.canvas.menus[1], [action('&Move here', self.moveShape)])
+        # addActions(self.canvas.menus[1], [action('&Move here', self.moveShape)])
         self.tools = self.toolbar('Tools')
 
         self.actions.advanced = (opendir, openNextImg, openPrevImg, createMode, autoDetectDir, autoDetect, save, reload, None, editMode, delete, generateOutput, None,  resetBoxes, resetSettings)
@@ -297,12 +280,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.image = QImage()
         self.filePath = ustr(defaultFilename)
         self.recentFiles = []
-        self.maxRecent = 7
+        # self.maxRecent = 7
         self.lineColor = None
         self.fillColor = None
         self.zoom_level = 100
         self.fit_window = False
-        # self.difficult = False
 
         ## Fix the compatible issue for qt4 and qt5. Convert the QStringList to python list
         if settings.get(SETTING_RECENT_FILES):
@@ -330,8 +312,6 @@ class MainWindow(QMainWindow, WindowMixin):
         Shape.line_color = self.lineColor = DEFAULT_LINE_COLOR
         Shape.fill_color = self.fillColor = DEFAULT_FILL_COLOR
         self.canvas.setDrawingColor(self.lineColor)
-        # # Add chris
-        # Shape.difficult = self.difficult
 
         def xbool(x):
             if isinstance(x, QVariant):
@@ -349,17 +329,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Callbacks:
         self.zoomWidget.valueChanged.connect(self.paintCanvas)
-
         self.populateModeActions()
-
-        # Display cursor coordinates at the right of status bar
         self.labelCoordinates = QLabel('')
         self.statusBar().addPermanentWidget(self.labelCoordinates)
-
         # Open Dir if deafult file
         if self.filePath and os.path.isdir(self.filePath):
             pass
-            # self.openDirDialog(dirpath=self.filePath)
 
 ########################################################################################################
 ########################################################################################################
@@ -477,17 +452,11 @@ class MainWindow(QMainWindow, WindowMixin):
     def btnstate(self, item=None):
         if not self.canvas.editing():
             return
-        # difficult = self.diffcButton.isChecked()
         try:
             shape = self.itemsToShapes[item]
         except:
             pass
-        # Checked and Update
         try:
-            # if difficult != shape.difficult:
-            #     shape.difficult = difficult
-            #     self.setDirty()
-            # else:  # User probably changed item visibility
                 self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
         except Exception as e:
             print(e)
@@ -527,7 +496,6 @@ class MainWindow(QMainWindow, WindowMixin):
             if contour_points:
                 for x, y in contour_points:
                     shape.addContourPoint((x, y))
-            # shape.difficult = difficult
             shape.confidence = confidence
             shape.contourEdited = contourEdited
             shape.close()
@@ -554,16 +522,13 @@ class MainWindow(QMainWindow, WindowMixin):
                         line_color=s.line_color.getRgb(),
                         fill_color=s.fill_color.getRgb(),
                         points=[(p.x(), p.y()) for p in s.points],
-                        # difficult=s.difficult,
                         contour_points=s.contour_points,
                         confidence=s.confidence,
                         contourEdited=s.contourEdited)
 
         shapes = [format_shape(shape) for shape in self.canvas.shapes]
-        # Can add differrent annotation formats here
         try:
             if self.usingPascalVocFormat is True:
-                # print('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
                 logging.info('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
                 self.labelFile.savePascalVocFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.lineColor.getRgb(), self.fillColor.getRgb())
             else:
@@ -579,8 +544,6 @@ class MainWindow(QMainWindow, WindowMixin):
             self._noSelectionSlot = True
             self.canvas.selectShape(self.itemsToShapes[item])
             shape = self.itemsToShapes[item]
-            # # Add Chris
-            # self.diffcButton.setChecked(shape.difficult)
 
     def labelItemChanged(self, item):
         shape = self.itemsToShapes[item]
@@ -589,7 +552,7 @@ class MainWindow(QMainWindow, WindowMixin):
             shape.label = item.text()
             shape.line_color = generateColorByText(shape.label)
             self.setDirty()
-        else:  # User probably changed item visibility
+        else:
             self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
 
     def newShape(self):
@@ -597,7 +560,6 @@ class MainWindow(QMainWindow, WindowMixin):
         position MUST be in global coordinates.
         """
         text = 'cell'
-        # self.diffcButton.setChecked(False)
         if text is not None:
             generate_color = generateColorByText(text)
             shape = self.canvas.setLastLabel(text, generate_color, generate_color)
@@ -675,7 +637,6 @@ class MainWindow(QMainWindow, WindowMixin):
             filePath = self.settings.get(SETTING_FILENAME)
         filePath = str(filePath)
         unicodeFilePath = ustr(filePath)
-        # Highlight the file item
         if unicodeFilePath and self.fileListWidget.count() > 0:
             index = self.mImgList.index(unicodeFilePath)
             fileWidgetItem = self.fileListWidget.item(index)
@@ -700,9 +661,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.canvas.setEnabled(True)
             self.adjustScale(initial=True)
             self.paintCanvas()
-            # self.addRecentFile(self.filePath)
             self.toggleActions(True)
-            # Label xml file and show bound box according to its filename
             if self.usingPascalVocFormat is True:
                 if self.defaultSaveDir is not None:
                     basename = os.path.basename(os.path.splitext(self.filePath)[0]) + XML_EXT
@@ -781,7 +740,6 @@ class MainWindow(QMainWindow, WindowMixin):
     def reloadImg(self):
         if not self.mayContinue():
             return
-        # print('Reload image')
         logging.info('Bild neu laden')
         self.loadFile(self.filePath)
 
@@ -791,20 +749,16 @@ class MainWindow(QMainWindow, WindowMixin):
             if not os.path.exists(anno_file):
                 self.noAnnotationFileDialog()
                 return
+        if not self.deleteAnnotationsDialog():
+            return
         os.remove(anno_file)
-        # print('Reset image')
         logging.info('Reset image')
         self.reloadImg()
 
     def cellDetection(self):
         if not self.mayContinue():
             return
-        # print(self.filePath)
         logging.info(self.filePath)
-        # if path is None:
-        #     currentPath = self.filePath
-        # else:
-        #     currentPath = path
         currentPath = self.filePath
         localPath = self.filePath.split(os.path.basename(currentPath))[0]
         imgFileName = os.path.basename(currentPath)
@@ -827,7 +781,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.loadRecent(currentPath, True)
 
     def cellDetectionDir(self):
-        # print(self.mImgList)
         progress = QProgressDialog('Erkenne Zellen {0}/{1}'.format(0, len(self.mImgList)), None, 0, 0, self)
         progress.setWindowTitle('Bitte warten')
         progress.setWindowModality(Qt.WindowModal)
@@ -844,19 +797,15 @@ class MainWindow(QMainWindow, WindowMixin):
         progress = QMessageBox.information(self, u'Information', 'Erkennnung der Zellen abgeschlossen')
 
     def calcContours(self):
-        # from OpenCV contour examples
         rendered = False
         if not self.canvas.shapes:
             return
         else:
-            # contourOverlay = np.zeros((self.image.height(), self.image.width(), 3), dtype=np.uint8)
-            # fullImg = cv2.imread(self.filePath, cv2.IMREAD_COLOR)
             fullImg = io.imread(self.filePath)
             for i, s in enumerate(self.canvas.shapes):
                 xmin, ymin = int(s.points[0].x()), int(s.points[0].y())
                 xmax, ymax = int(s.points[2].x()), int(s.points[2].y())
                 img = fullImg[ymin:ymax + 1, xmin:xmax + 1, :]
-                # outerContour = np.zeros((img.shape[0], img.shape[1], 3)).astype(np.uint8)
 
                 if self.canvas.shapes[i].contour_points:
                     continue
@@ -868,19 +817,14 @@ class MainWindow(QMainWindow, WindowMixin):
                         if img.shape[0] <= 1 or img.shape[1] <= 1:
                             raise ValueError('Box ist vertikale oder horizontale Linie')
                     except ValueError as e:
-                        # print(e)
-                        # print(img, xmin, xmax, ymin, ymax)
-                        # print('Möglicherweise konnten nicht alle Konturen berechnet werden')
                         logging.error('Not all contours could be calculated:{}{}{}{}{}{}'.format(e, img, xmin, xmax, ymin, ymax))
                         self.statusBar().showMessage('Möglicherweise konnten nicht alle Konturen berechnet werden')
                         self.statusBar().show()
                         continue
                     if self.unet_usage:
-                        # print('Calling UNet')
                         logging.info('Calling Unet')
                         points = self.unet_seg.predictContour(img)
                     else:
-                        # print('Rendering {0}'.format(img.shape))
                         logging.info('Rendering {0}'.format(img.shape))
                         img = enhance_contrast(img, disk(15))
                         image = img_as_float(img)
@@ -1013,14 +957,10 @@ class MainWindow(QMainWindow, WindowMixin):
             self.fileListWidget.addItem(item)
 
     def openPrevImg(self, _value=False):
-        # Proceding prev image without dialog if having any label
         if self.autoSaving:
             if self.defaultSaveDir is not None:
                 if self.dirty is True:
                     self.saveFile()
-            # else:
-            #     self.changeSavedirDialog()
-            #     return
         if self.dirty:
             self.saveFile()
         if len(self.mImgList) <= 0:
@@ -1038,14 +978,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
 
     def openNextImg(self, _value=False):
-        # Proceding prev image without dialog if having any label
         if self.autoSaving:
             if self.defaultSaveDir is not None:
                 if self.dirty is True:
                     self.saveFile()
-            # else:
-            #     self.changeSavedirDialog()
-            #     return
         if self.dirty:
             self.saveFile()
         if len(self.mImgList) <= 0:
@@ -1094,7 +1030,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.setClean()
         self.toggleActions(False)
         self.canvas.setEnabled(False)
-        #self.actions.saveAs.setEnabled(False)
 
     def resetAll(self):
         self.settings.reset()
@@ -1115,10 +1050,12 @@ class MainWindow(QMainWindow, WindowMixin):
         msg = u'Keine Datei mit Annnotationen gefunden !'
         return QMessageBox.information(self, u'Keine Annotationen gefunden', msg, ok)
 
-    def sureWithSavinDialog(self):
+    def deleteAnnotationsDialog(self, fileName=None):
         yes, no = QMessageBox.Yes, QMessageBox.No
-        msg = u'Sind alle Annotationen und Konturen wie gewünscht ? \n Die alten gespeicherten Annotationen werden \nvollständig überschrieben'
-        return yes == QMessageBox.warning(self, u'Speichern', msg, yes | no)
+        if fileName is None: 
+            fileName = (self.filePath.split('/')[-1]).split('.')[0] + XML_EXT
+        msg = u'Möchten Sie alle gespeicherten Daten zu {0} wirklich löschen ?'.format(fileName)
+        return yes == QMessageBox.warning(self, u'Löschen', msg, yes | no)
 
     def errorMessage(self, title, message):
         return QMessageBox.critical(self, title, '<p><b>%s</b></p>%s' % (title, message))

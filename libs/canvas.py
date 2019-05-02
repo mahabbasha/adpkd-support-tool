@@ -684,15 +684,20 @@ class Canvas(QWidget):
             self.moveOnePixel('Up')
         elif key == Qt.Key_Down and self.selectedShape:
             self.moveOnePixel('Down')
+        elif key == Qt.Key_S and self.selectedShape:
+            if(not self.selectedShape.contourEdited):
+                self.selectedShape.contourEdited = True
+                self.deSelectShape()
+                self.update()
         elif key == Qt.Key_E and self.selectedShape and self.showContourOverlay:
             self.contourMode = True
             self.unHighlight()
-            print('Entering contour mode')
+            # print('Entering contour mode')
         elif key == Qt.Key_Q and self.selectedShape and self.contourMode:
             self.contourMode = False
             self.selectedShape.contourEdited = True
             self.deSelectShape()
-            print('Leaving contour mode')
+            # print('Leaving contour mode')
             self.saveFileSignal.emit()
         elif key == Qt.Key_N and self.selectedShape and self.contourMode:
             if not self.selectedShape.contour_points:

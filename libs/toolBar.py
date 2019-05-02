@@ -29,11 +29,11 @@ class ToolBar(QToolBar):
 
 class ToolButton(QToolButton):
     """ToolBar companion class which ensures all buttons have the same size."""
-    minSize = (60, 60)
+    minSize = (30, 30)
 
     def minimumSizeHint(self):
         ms = super(ToolButton, self).minimumSizeHint()
-        w1, h1 = ms.width(), ms.height()
-        w2, h2 = self.minSize
-        ToolButton.minSize = max(w1, w2), max(h1, h2)
+        # w1, h1 = ms.width(), ms.height()
+        # w2, h2 = self.minSize
+        # ToolButton.minSize = max(w1, w2), max(h1, h2)
         return QSize(*ToolButton.minSize)
